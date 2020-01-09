@@ -29,11 +29,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="D3D11Base.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ResourceCompile Include="D3D11Base.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
@@ -45,5 +40,14 @@
     <Image Include="D3D11Base.ico">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="MyPShader.hlsl" />
+    <FxCompile Include="MyVShader.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="D3D11Base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

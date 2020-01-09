@@ -7,11 +7,28 @@
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
+#include "MyVShader.csh"
+#include "MyPShader.csh"
+
+// for init
 ID3D11Device* myDev;
 IDXGISwapChain* mySwap;
 ID3D11DeviceContext* myCon;
+
+// for drawing
 ID3D11RenderTargetView* myRtv;
 D3D11_VIEWPORT myPort;
+
+struct MyVertex
+{
+	float xyzw[4];
+	float rgba[4];
+};
+
+ID3D11Buffer* vBuff;
+ID3D11InputLayout* vLayout;
+ID3D11VertexShader* vShader; // HLSL
+ID3D11PixelShader* pShader; // HLSL
 
 #define MAX_LOADSTRING 100
 
@@ -64,17 +81,48 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			break;
 
 		// rendering here
-		//ID3D11RenderTargetView* tempRTV[] = { myRtv };
-		//myCon->OMSetRenderTargets(1, tempRTV, nullptr);
-
 		float color[] = { 0, 1, 1, 1 };
 		myCon->ClearRenderTargetView(myRtv, color);
+
+		// Setup the pipeline
+
+		// output merger
+		ID3D11RenderTargetView* tempRTV[] = { myRtv };
+		myCon->OMSetRenderTargets(1, tempRTV, nullptr);
+		// rasterizer
+		myCon->RSSetViewports(1, &myPort);
+		// Input Assembler
+		myCon->IASetInputLayout(vLayout);
+		UINT strides[] = {sizeof(MyVertex)};
+		UINT offsets[] = { 0 };
+		ID3D11Buffer* tempVB[] = { vBuff };
+		myCon->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
+		myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// Vertex Shader Stage
+		myCon->VSSetShader(vShader, 0, 0);
+		// Pixel Shader Stage
+		myCon->PSSetShader(pShader, 0, 0);
+
+		// Draw?
+		myCon->Draw(3, 0);
+
+		// Try and Make your triangle 3D
+
+			// make into a pyramid (more verts)
+
+			// make a world, view & projection matrix
+
+			// Upload those matrices to the video card
+				// Create and update a constant buffer (move variable from C++ to shaders)
+
+			// Apply matrix math in Vertex Shader
 
 		mySwap->Present(1, 0);
 	}
 
 	// release all out D3D11 interfaces
 	myRtv->Release();
+	vBuff->Release();
 	myCon->Release();
 	mySwap->Release();
 	myDev->Release();
@@ -166,6 +214,45 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	myPort.TopLeftX = myPort.TopLeftY = 0;
 	myPort.MinDepth = 0;
 	myPort.MaxDepth = 1;
+
+	MyVertex tri[] = // NDC Normalized Device Coordinates
+	{ // xyzw, rgba
+		{ { 0.0f,  0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
+		{ { 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
+		{ {-0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} }
+	};
+
+	// load it on the card
+	D3D11_BUFFER_DESC bDesc;
+	D3D11_SUBRESOURCE_DATA subData;
+	ZeroMemory(&bDesc, sizeof(bDesc));
+	ZeroMemory(&subData, sizeof(subData));
+
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(MyVertex) * 3;
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+	
+	subData.pSysMem = tri;
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &vBuff);
+
+	// write and compile & load our shaders
+
+	hr = myDev->CreateVertexShader(MyVShader, sizeof(MyVShader), nullptr, &vShader);
+	hr = myDev->CreatePixelShader(MyPShader, sizeof(MyPShader), nullptr, &pShader);
+
+	// describe the vertex to D3D11
+	D3D11_INPUT_ELEMENT_DESC ieDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(ieDesc, 2, MyVShader, sizeof(MyVShader), &vLayout);
+
 
 	return TRUE;
 }
