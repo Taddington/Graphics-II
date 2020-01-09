@@ -7,6 +7,9 @@
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
+#include <DirectXMath.h>
+using namespace DirectX;
+
 #include "MyVShader.csh"
 #include "MyPShader.csh"
 
@@ -18,17 +21,30 @@ ID3D11DeviceContext* myCon;
 // for drawing
 ID3D11RenderTargetView* myRtv;
 D3D11_VIEWPORT myPort;
+float aspectRatio = 1;
 
 struct MyVertex
 {
 	float xyzw[4];
 	float rgba[4];
 };
+unsigned int numVerts = 0;
 
 ID3D11Buffer* vBuff;
 ID3D11InputLayout* vLayout;
 ID3D11VertexShader* vShader; // HLSL
 ID3D11PixelShader* pShader; // HLSL
+
+ID3D11Buffer* cBuff; // shader vars
+
+// Math stuff
+struct WVP
+{
+	XMFLOAT4X4 wMatrix; // storage type
+	XMFLOAT4X4 vMatrix;
+	XMFLOAT4X4 pMatrix;
+};
+WVP MyMatrices;
 
 #define MAX_LOADSTRING 100
 
@@ -93,7 +109,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->RSSetViewports(1, &myPort);
 		// Input Assembler
 		myCon->IASetInputLayout(vLayout);
-		UINT strides[] = {sizeof(MyVertex)};
+		UINT strides[] = { sizeof(MyVertex) };
 		UINT offsets[] = { 0 };
 		ID3D11Buffer* tempVB[] = { vBuff };
 		myCon->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
@@ -104,20 +120,42 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->PSSetShader(pShader, 0, 0);
 
 		// Draw?
-		myCon->Draw(3, 0);
+		myCon->Draw(numVerts, 0);
 
 		// Try and Make your triangle 3D
 
-			// make into a pyramid (more verts)
+		// make into a pyramid (more verts)
 
-			// make a world, view & projection matrix
+		// make a world, view & projection matrix
+		static float rot = 0; rot += 0.01f;
+		XMMATRIX temp = XMMatrixIdentity();
+		temp = XMMatrixTranslation(0, 0, 2);
+		XMMATRIX temp2 = XMMatrixRotationY(rot);
+		temp = XMMatrixMultiply(temp2, temp);
+		XMStoreFloat4x4(&MyMatrices.wMatrix, temp);
+		// view
+		temp = XMMatrixLookAtLH({ 2, 5, -1 }, { 0, 0, 1 }, { 0, 1, 0 });
+		XMStoreFloat4x4(&MyMatrices.vMatrix, temp);
+		// projection
+		temp = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
+		XMStoreFloat4x4(&MyMatrices.pMatrix, temp);
 
-			// Upload those matrices to the video card
-				// Create and update a constant buffer (move variable from C++ to shaders)
+		// Upload those matrices to the video card
+		// Create and update a constant buffer (move variable from C++ to shaders)
+		D3D11_MAPPED_SUBRESOURCE gpuBuffer;
+		HRESULT hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+		*((WVP*)(gpuBuffer.pData)) = MyMatrices;
+		//memcpy(gpuBuffer.pData, &MyMatrices, sizeof(WVP));
+		myCon->Unmap(cBuff, 0);
 
-			// Apply matrix math in Vertex Shader
 
-		mySwap->Present(1, 0);
+		// Apply matrix math in Vertex Shader _ check
+		// connect constant buffer to pipeline _ check
+		// remember by default HLSL matrices are COLUMN MAJOR
+		ID3D11Buffer* constants[] = { cBuff };
+		myCon->VSSetConstantBuffers(0, 1, constants);
+
+		mySwap->Present(0, 0);
 	}
 
 	// release all out D3D11 interfaces
@@ -125,6 +163,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	vBuff->Release();
 	myCon->Release();
 	mySwap->Release();
+	vShader->Release();
+	pShader->Release();
+	vLayout->Release();
 	myDev->Release();
 
 	return (int)msg.wParam;
@@ -200,6 +241,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	swap.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swap.SampleDesc.Count = 1;
 
+	aspectRatio = swap.BufferDesc.Width / float(swap.BufferDesc.Height);
+
 	HRESULT hr;
 	hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_DEBUG, &dx11, 1, D3D11_SDK_VERSION, &swap, &mySwap, &myDev, NULL, &myCon);
 
@@ -217,10 +260,24 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	MyVertex tri[] = // NDC Normalized Device Coordinates
 	{ // xyzw, rgba
-		{ { 0.0f,  0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
-		{ { 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
-		{ {-0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} }
+		// front
+		{ {   0.0f,   1.0f,   0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
+		{ {  0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
+		{ { -0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} },
+		// right
+		{ {   0.0f,   1.0f,   0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
+		{ {  0.25f, -0.25f,  0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
+		{ {  0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} },
+		// back
+		{ {   0.0f,   1.0f,  0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
+		{ { -0.25f, -0.25f, 0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
+		{ {  0.25f, -0.25f, 0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} },
+		// left
+		{ {   0.0f,   1.0f,   0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
+		{ { -0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
+		{ { -0.25f, -0.25f,  0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} }
 	};
+	numVerts = ARRAYSIZE(tri);
 
 	// load it on the card
 	D3D11_BUFFER_DESC bDesc;
@@ -229,12 +286,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ZeroMemory(&subData, sizeof(subData));
 
 	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	bDesc.ByteWidth = sizeof(MyVertex) * 3;
+	bDesc.ByteWidth = sizeof(MyVertex) * ARRAYSIZE(tri);
 	bDesc.CPUAccessFlags = 0;
 	bDesc.MiscFlags = 0;
 	bDesc.StructureByteStride = 0;
 	bDesc.Usage = D3D11_USAGE_DEFAULT;
-	
+
 	subData.pSysMem = tri;
 
 	hr = myDev->CreateBuffer(&bDesc, &subData, &vBuff);
@@ -253,6 +310,17 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	hr = myDev->CreateInputLayout(ieDesc, 2, MyVShader, sizeof(MyVShader), &vLayout);
 
+	// create constant buffer
+	ZeroMemory(&bDesc, sizeof(bDesc));
+
+	bDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bDesc.ByteWidth = sizeof(WVP);
+	bDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DYNAMIC;
+
+	hr = myDev->CreateBuffer(&bDesc, nullptr, &cBuff);
 
 	return TRUE;
 }
