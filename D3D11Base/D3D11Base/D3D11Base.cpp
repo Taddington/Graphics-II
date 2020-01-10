@@ -13,6 +13,11 @@ using namespace DirectX;
 #include "MyVShader.csh"
 #include "MyPShader.csh"
 
+#include "MyMeshVShader.csh" // don't add a .csh to you project!
+
+// pre-made mesh
+#include "Assets/StoneHenge.h"
+
 // for init
 ID3D11Device* myDev;
 IDXGISwapChain* mySwap;
@@ -36,6 +41,18 @@ ID3D11VertexShader* vShader; // HLSL
 ID3D11PixelShader* pShader; // HLSL
 
 ID3D11Buffer* cBuff; // shader vars
+
+// mesh data
+ID3D11Buffer* vBuffMesh; // vertex buffer
+ID3D11Buffer* iBuffMesh; // index buffer
+
+// mesh vertex shader
+ID3D11VertexShader* vMeshShader; // HLSL
+ID3D11InputLayout* vMeshLayout;
+
+// X buffer for depth sorting
+ID3D11Texture2D* zBuffer;
+ID3D11DepthStencilView* zBufferView;
 
 // Math stuff
 struct WVP
@@ -100,11 +117,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		float color[] = { 0, 1, 1, 1 };
 		myCon->ClearRenderTargetView(myRtv, color);
 
+		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
+
 		// Setup the pipeline
 
 		// output merger
 		ID3D11RenderTargetView* tempRTV[] = { myRtv };
-		myCon->OMSetRenderTargets(1, tempRTV, nullptr);
+		myCon->OMSetRenderTargets(1, tempRTV, zBufferView);
 		// rasterizer
 		myCon->RSSetViewports(1, &myPort);
 		// Input Assembler
@@ -119,9 +138,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// Pixel Shader Stage
 		myCon->PSSetShader(pShader, 0, 0);
 
-		// Draw?
-		myCon->Draw(numVerts, 0);
-
 		// Try and Make your triangle 3D
 
 		// make into a pyramid (more verts)
@@ -129,12 +145,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// make a world, view & projection matrix
 		static float rot = 0; rot += 0.01f;
 		XMMATRIX temp = XMMatrixIdentity();
-		temp = XMMatrixTranslation(0, 0, 2);
+		temp = XMMatrixTranslation(3, 2, -5);
 		XMMATRIX temp2 = XMMatrixRotationY(rot);
 		temp = XMMatrixMultiply(temp2, temp);
 		XMStoreFloat4x4(&MyMatrices.wMatrix, temp);
 		// view
-		temp = XMMatrixLookAtLH({ 2, 5, -1 }, { 0, 0, 1 }, { 0, 1, 0 });
+		temp = XMMatrixLookAtLH({ 1, 5, -10 }, { 0, 0, 0 }, { 0, 1, 0 });
 		XMStoreFloat4x4(&MyMatrices.vMatrix, temp);
 		// projection
 		temp = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
@@ -155,6 +171,38 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		ID3D11Buffer* constants[] = { cBuff };
 		myCon->VSSetConstantBuffers(0, 1, constants);
 
+		// Draw?
+		myCon->Draw(numVerts, 0);
+
+		// immediate context
+
+		// get a more complex pre-made mesh (FBX, OBJ, custom header) _ check
+		// load it onto the card (vertex buffer, index buffer) _ check
+		// make sure our shaders can process it _ check?
+		// place it somewhere else in the environment ???
+
+		// set pipeline
+		UINT mesh_strides[] = { sizeof(_OBJ_VERT_) };
+		UINT mesh_offsets[] = { 0 };
+		ID3D11Buffer* meshVB[] = { vBuffMesh };
+		myCon->IASetVertexBuffers(0, 1, meshVB, mesh_strides, mesh_offsets);
+		myCon->IASetIndexBuffer(iBuffMesh, DXGI_FORMAT_R32_UINT, 0);
+		myCon->VSSetShader(vMeshShader, 0, 0);
+		myCon->IASetInputLayout(vMeshLayout);
+
+		// modify world matrix before drawing next thing
+		temp = XMMatrixIdentity();
+		XMStoreFloat4x4(&MyMatrices.wMatrix, temp);
+		// send it ot the CARD
+		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+		*((WVP*)(gpuBuffer.pData)) = MyMatrices;
+		myCon->Unmap(cBuff, 0);
+
+
+		// draw it
+		myCon->DrawIndexed(2532, 0, 0);
+
+
 		mySwap->Present(0, 0);
 	}
 
@@ -167,6 +215,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	pShader->Release();
 	vLayout->Release();
 	myDev->Release();
+	cBuff->Release();
+	iBuffMesh->Release();
+	vBuffMesh->Release();
+	vMeshShader->Release();
+	vMeshLayout->Release();
+	zBuffer->Release();
+	zBufferView->Release();
+
 
 	return (int)msg.wParam;
 }
@@ -290,7 +346,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	bDesc.CPUAccessFlags = 0;
 	bDesc.MiscFlags = 0;
 	bDesc.StructureByteStride = 0;
-	bDesc.Usage = D3D11_USAGE_DEFAULT;
+	bDesc.Usage = D3D11_USAGE_IMMUTABLE;
 
 	subData.pSysMem = tri;
 
@@ -321,6 +377,52 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	bDesc.Usage = D3D11_USAGE_DYNAMIC;
 
 	hr = myDev->CreateBuffer(&bDesc, nullptr, &cBuff);
+
+	// load our complex mesh onto the card
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(StoneHenge_data);
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_IMMUTABLE;
+
+	subData.pSysMem = StoneHenge_data;
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &vBuffMesh); // vertex buffer
+	// index buffer mesh
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(StoneHenge_indicies);
+	subData.pSysMem = StoneHenge_indicies;
+	hr = myDev->CreateBuffer(&bDesc, &subData, &iBuffMesh);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyMeshVShader, sizeof(MyMeshVShader), nullptr, &vMeshShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC meshInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(meshInputDesc, 3, MyMeshVShader, sizeof(MyMeshVShader), &vMeshLayout);
+
+	// create Z buffer & view
+	D3D11_TEXTURE2D_DESC zDesc;
+	ZeroMemory(&zDesc, sizeof(zDesc));
+	zDesc.ArraySize = 1;
+	zDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	zDesc.Width = swap.BufferDesc.Width;
+	zDesc.Height = swap.BufferDesc.Height;
+	zDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	zDesc.Usage = D3D11_USAGE_DEFAULT;
+	zDesc.MipLevels = 1;
+	zDesc.SampleDesc.Count = 1;
+
+	hr = myDev->CreateTexture2D(&zDesc, nullptr, &zBuffer);
+
+	hr = myDev->CreateDepthStencilView(zBuffer, nullptr, &zBufferView);
 
 	return TRUE;
 }

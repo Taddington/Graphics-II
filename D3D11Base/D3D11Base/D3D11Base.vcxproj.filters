@@ -27,6 +27,9 @@
     <ClInclude Include="D3D11Base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\StoneHenge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="D3D11Base.rc">
@@ -44,6 +47,7 @@
   <ItemGroup>
     <FxCompile Include="MyPShader.hlsl" />
     <FxCompile Include="MyVShader.hlsl" />
+    <FxCompile Include="MyMeshVShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D11Base.cpp">
