@@ -20,7 +20,6 @@ using namespace DirectX;
 
 // pre-made mesh
 #include "Assets/StoneHenge.h"
-#include "Assets/StoneHenge_Texture.h"
 
 // for init
 ID3D11Device* myDev;
@@ -64,13 +63,15 @@ ID3D11Texture2D* mTexture;
 ID3D11ShaderResourceView* textureRV;
 
 // Math stuff
-struct WVP
+struct ConstantBuffer
 {
 	XMFLOAT4X4 wMatrix; // storage type
 	XMFLOAT4X4 vMatrix;
 	XMFLOAT4X4 pMatrix;
+	XMFLOAT4 vLightDir;
+	XMFLOAT4 vLightColor;
 };
-WVP MyMatrices;
+ConstantBuffer myCBuff;
 
 #define MAX_LOADSTRING 100
 
@@ -123,7 +124,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			break;
 
 		// rendering here
-		float color[] = { 0, 1, 1, 1 };
+		float color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+		myCBuff.vLightDir = XMFLOAT4(0.577f, 0.577f, -0.577f, 1.0f);
+		myCBuff.vLightColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
 		myCon->ClearRenderTargetView(myRtv, color);
 
 		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
@@ -157,19 +160,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		temp = XMMatrixTranslation(3, 2, -5);
 		XMMATRIX temp2 = XMMatrixRotationY(rot);
 		temp = XMMatrixMultiply(temp2, temp);
-		XMStoreFloat4x4(&MyMatrices.wMatrix, temp);
+		XMStoreFloat4x4(&myCBuff.wMatrix, temp);
 		// view
 		temp = XMMatrixLookAtLH({ 1, 5, -10 }, { 0, 0, 0 }, { 0, 1, 0 });
-		XMStoreFloat4x4(&MyMatrices.vMatrix, temp);
+		XMStoreFloat4x4(&myCBuff.vMatrix, temp);
 		// projection
 		temp = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
-		XMStoreFloat4x4(&MyMatrices.pMatrix, temp);
+		XMStoreFloat4x4(&myCBuff.pMatrix, temp);
 
 		// Upload those matrices to the video card
 		// Create and update a constant buffer (move variable from C++ to shaders)
 		D3D11_MAPPED_SUBRESOURCE gpuBuffer;
 		HRESULT hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		*((WVP*)(gpuBuffer.pData)) = MyMatrices;
+		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
 		//memcpy(gpuBuffer.pData, &MyMatrices, sizeof(WVP));
 		myCon->Unmap(cBuff, 0);
 
@@ -179,6 +182,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// remember by default HLSL matrices are COLUMN MAJOR
 		ID3D11Buffer* constants[] = { cBuff };
 		myCon->VSSetConstantBuffers(0, 1, constants);
+		myCon->PSSetConstantBuffers(0, 1, constants);
 
 		// Draw?
 		myCon->Draw(numVerts, 0);
@@ -203,10 +207,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// modify world matrix before drawing next thing
 		temp = XMMatrixIdentity();
-		XMStoreFloat4x4(&MyMatrices.wMatrix, temp);
+		XMStoreFloat4x4(&myCBuff.wMatrix, temp);
 		// send it ot the CARD
 		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		*((WVP*)(gpuBuffer.pData)) = MyMatrices;
+		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
 		myCon->Unmap(cBuff, 0);
 
 		// draw it
@@ -383,7 +387,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ZeroMemory(&bDesc, sizeof(bDesc));
 
 	bDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bDesc.ByteWidth = sizeof(WVP);
+	bDesc.ByteWidth = sizeof(ConstantBuffer);
 	bDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	bDesc.MiscFlags = 0;
 	bDesc.StructureByteStride = 0;

@@ -23,6 +23,9 @@ cbuffer SHADER_VARS : register(b0)
 	float4x4 worldMatrix;
 	float4x4 viewMatrix;
 	float4x4 projectionMatrix;
+	float4 lightDir;
+	float4 lightColor;
+	float4 outputColor;
 };
 
 OutputVertex main(InputVertex input)
