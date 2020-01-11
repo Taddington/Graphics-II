@@ -14,6 +14,8 @@ struct InputVertex
 struct OutputVertex
 {
 	float4 xyzw : SV_POSITION; // system value
+	float4 uvws : OTEXTURE;
+	float4 nrms : ONORMAL;
 	float4 rgba : OCOLOR;
 };
 
@@ -28,7 +30,8 @@ OutputVertex main(InputVertex input)
 {
 	OutputVertex output = (OutputVertex)0;
 	output.xyzw = float4(input.xyz, 1);
-	output.rgba.rgb = input.nrm;
+	output.nrms.xyz = input.nrm;
+	output.uvws.xyz = input.uvw;
 	// Do math here (shader intrinsics)
 
 	output.xyzw = mul(worldMatrix, output.xyzw);

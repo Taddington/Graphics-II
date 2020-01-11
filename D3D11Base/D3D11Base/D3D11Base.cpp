@@ -7,6 +7,8 @@
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
+#include "DDSTextureLoader.h"
+
 #include <DirectXMath.h>
 using namespace DirectX;
 
@@ -14,9 +16,11 @@ using namespace DirectX;
 #include "MyPShader.csh"
 
 #include "MyMeshVShader.csh" // don't add a .csh to you project!
+#include "MyMeshPShader.csh"
 
 // pre-made mesh
 #include "Assets/StoneHenge.h"
+#include "Assets/StoneHenge_Texture.h"
 
 // for init
 ID3D11Device* myDev;
@@ -49,10 +53,15 @@ ID3D11Buffer* iBuffMesh; // index buffer
 // mesh vertex shader
 ID3D11VertexShader* vMeshShader; // HLSL
 ID3D11InputLayout* vMeshLayout;
+ID3D11PixelShader* pMeshShader; // HLSL
 
 // X buffer for depth sorting
 ID3D11Texture2D* zBuffer;
 ID3D11DepthStencilView* zBufferView;
+
+// texture varialbles
+ID3D11Texture2D* mTexture;
+ID3D11ShaderResourceView* textureRV;
 
 // Math stuff
 struct WVP
@@ -175,7 +184,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->Draw(numVerts, 0);
 
 		// immediate context
-
+		ID3D11ShaderResourceView* texViews[] { textureRV };
+		myCon->PSSetShaderResources(0, 1, texViews);
 		// get a more complex pre-made mesh (FBX, OBJ, custom header) _ check
 		// load it onto the card (vertex buffer, index buffer) _ check
 		// make sure our shaders can process it _ check?
@@ -188,6 +198,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->IASetVertexBuffers(0, 1, meshVB, mesh_strides, mesh_offsets);
 		myCon->IASetIndexBuffer(iBuffMesh, DXGI_FORMAT_R32_UINT, 0);
 		myCon->VSSetShader(vMeshShader, 0, 0);
+		myCon->PSSetShader(pMeshShader, 0, 0);
 		myCon->IASetInputLayout(vMeshLayout);
 
 		// modify world matrix before drawing next thing
@@ -197,7 +208,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
 		*((WVP*)(gpuBuffer.pData)) = MyMatrices;
 		myCon->Unmap(cBuff, 0);
-
 
 		// draw it
 		myCon->DrawIndexed(2532, 0, 0);
@@ -222,6 +232,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	vMeshLayout->Release();
 	zBuffer->Release();
 	zBufferView->Release();
+	pMeshShader->Release();
+	textureRV->Release();
+	mTexture->Release();
 
 
 	return (int)msg.wParam;
@@ -397,6 +410,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	// load our new mesh shader
 	hr = myDev->CreateVertexShader(MyMeshVShader, sizeof(MyMeshVShader), nullptr, &vMeshShader);
+	hr = myDev->CreatePixelShader(MyMeshPShader, sizeof(MyMeshPShader), nullptr, &pMeshShader);
 
 	// make matching input layout for mesh vertex
 	D3D11_INPUT_ELEMENT_DESC meshInputDesc[] =
@@ -407,6 +421,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	};
 
 	hr = myDev->CreateInputLayout(meshInputDesc, 3, MyMeshVShader, sizeof(MyMeshVShader), &vMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/StoneHenge.dds", (ID3D11Resource**)&mTexture, &textureRV);
 
 	// create Z buffer & view
 	D3D11_TEXTURE2D_DESC zDesc;
