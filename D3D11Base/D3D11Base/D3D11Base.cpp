@@ -68,10 +68,14 @@ struct ConstantBuffer
 	XMFLOAT4X4 wMatrix; // storage type
 	XMFLOAT4X4 vMatrix;
 	XMFLOAT4X4 pMatrix;
-	XMFLOAT4 vLightDir;
-	XMFLOAT4 vLightColor;
+	XMFLOAT4 directionalLightPos;
+	XMFLOAT4 directionalLightColor;
+	XMFLOAT4 pointLightPos;
+	XMFLOAT4 pointLightColor;
+	XMFLOAT4 pointLightRadius = XMFLOAT4(1500.0f, 0.0f, 0.0f, 0.0f);
 };
 ConstantBuffer myCBuff;
+bool toReduceRadius = false;
 
 #define MAX_LOADSTRING 100
 
@@ -125,8 +129,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// rendering here
 		float color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		myCBuff.vLightDir = XMFLOAT4(0.577f, 0.577f, -0.577f, 1.0f);
-		myCBuff.vLightColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+		myCBuff.directionalLightPos = XMFLOAT4(0.577f, 0.577f, -0.577f, 1.0f);
+		myCBuff.directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
+		myCBuff.pointLightPos = XMFLOAT4(-1.0f, 0.5f, -1.0f, 1.0f);
+		myCBuff.pointLightColor = XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
+		if (myCBuff.pointLightRadius.x > 5000.0f)
+			toReduceRadius = true;
+		else if (myCBuff.pointLightRadius.x < 10.0f)
+			toReduceRadius = false;
+		if (toReduceRadius)
+			myCBuff.pointLightRadius.x -= 5.0f;
+		else if (!toReduceRadius)
+			myCBuff.pointLightRadius.x += 5.0f;
 		myCon->ClearRenderTargetView(myRtv, color);
 
 		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
