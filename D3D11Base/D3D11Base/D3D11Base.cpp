@@ -129,18 +129,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// rendering here
 		float color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		myCBuff.directionalLightPos = XMFLOAT4(0.577f, 0.577f, -0.577f, 1.0f);
+		static float rotate = 0; rotate += 0.0025f;
+		XMMATRIX rotation = XMMatrixRotationY(rotate);
+		XMVECTOR dirLight = XMVectorSet(0.577f, 0.577f, -0.577f, 1.0f);
+		dirLight = XMVector4Transform(dirLight, rotation);
+		XMStoreFloat4(&myCBuff.directionalLightPos, dirLight);
 		myCBuff.directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
-		myCBuff.pointLightPos = XMFLOAT4(-1.0f, 0.5f, -1.0f, 1.0f);
+		myCBuff.pointLightPos = XMFLOAT4(1.0f, -0.5f, 1.0f, 1.0f);
 		myCBuff.pointLightColor = XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
-		if (myCBuff.pointLightRadius.x > 5000.0f)
+		if (myCBuff.pointLightRadius.x > 2500.0f)
 			toReduceRadius = true;
 		else if (myCBuff.pointLightRadius.x < 10.0f)
 			toReduceRadius = false;
 		if (toReduceRadius)
-			myCBuff.pointLightRadius.x -= 5.0f;
+			myCBuff.pointLightRadius.x -= 2.5f;
 		else if (!toReduceRadius)
-			myCBuff.pointLightRadius.x += 5.0f;
+			myCBuff.pointLightRadius.x += 2.5f;
 		myCon->ClearRenderTargetView(myRtv, color);
 
 		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
