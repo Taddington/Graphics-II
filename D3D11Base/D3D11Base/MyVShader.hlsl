@@ -28,12 +28,14 @@ cbuffer SHADER_VARS : register(b0)
 	float4 pointLightPos;
 	float4 pointLightColor;
 	float4 pointLightRadius;
+	float4 time;
 };
 
 OutputVertex main(InputVertex input)
 {
 	OutputVertex output = (OutputVertex)0;
 	output.xyzw = input.xyzw;
+	output.xyzw.y += sin(input.xyzw.x * 1 * time.x) * 0.1f;
 	output.rgba = input.rgba;
 	// Do math here (shader intrinsics)
 

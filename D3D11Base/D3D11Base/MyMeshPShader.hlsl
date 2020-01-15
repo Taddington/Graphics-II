@@ -11,6 +11,7 @@ cbuffer SHADER_VARS : register(b0)
 	float4 pointLightPos;
 	float4 pointLightColor;
 	float4 pointLightRadius;
+	float4 time;
 };
 
 struct OutputVertex

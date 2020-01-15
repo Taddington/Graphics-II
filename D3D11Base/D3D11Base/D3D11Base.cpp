@@ -20,6 +20,9 @@ using namespace DirectX;
 
 // pre-made mesh
 #include "Assets/StoneHenge.h"
+#include <Windows.h>
+#include <vector>
+using namespace std;
 
 // for init
 ID3D11Device* myDev;
@@ -36,6 +39,14 @@ struct MyVertex
 	float xyzw[4];
 	float rgba[4];
 };
+
+struct BaseMesh
+{
+	vector<MyVertex> vertList;
+	vector<int> indexList;
+};
+BaseMesh procedure;
+int numIndices = 0;
 unsigned int numVerts = 0;
 
 ID3D11Buffer* vBuff;
@@ -62,6 +73,8 @@ ID3D11DepthStencilView* zBufferView;
 ID3D11Texture2D* mTexture;
 ID3D11ShaderResourceView* textureRV;
 
+ID3D11Buffer* iBuff;
+
 // Math stuff
 struct ConstantBuffer
 {
@@ -73,8 +86,10 @@ struct ConstantBuffer
 	XMFLOAT4 pointLightPos;
 	XMFLOAT4 pointLightColor;
 	XMFLOAT4 pointLightRadius = XMFLOAT4(1500.0f, 0.0f, 0.0f, 0.0f);
+	XMFLOAT4 timer = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
 };
 ConstantBuffer myCBuff;
+XMMATRIX view = XMMatrixLookAtLH({ 1, 5, -10 }, { 0, 0, 0 }, { 0, 1, 0 });
 bool toReduceRadius = false;
 
 #define MAX_LOADSTRING 100
@@ -130,6 +145,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// rendering here
 		float color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 		static float rotate = 0; rotate += 0.0025f;
+		static float timep = 0; timep += 0.0025f;
+		XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
+		XMStoreFloat4(&myCBuff.timer, time);
 		XMMATRIX rotation = XMMatrixRotationY(rotate);
 		XMVECTOR dirLight = XMVectorSet(0.577f, 0.577f, -0.577f, 1.0f);
 		dirLight = XMVector4Transform(dirLight, rotation);
@@ -150,6 +168,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
 
 		// Setup the pipeline
+		//view
+		if (GetAsyncKeyState('W'))
+			view = XMMatrixMultiply(view, XMMatrixTranslation(0, 0, -0.1f));
+		if (GetAsyncKeyState('S'))
+			view = XMMatrixMultiply(view, XMMatrixTranslation(0, 0, 0.1f));
+		if (GetAsyncKeyState('A'))
+			view = XMMatrixMultiply(view, XMMatrixTranslation(0.1f, 0, 0));
+		if (GetAsyncKeyState('D'))
+			view = XMMatrixMultiply(view, XMMatrixTranslation(-0.1f, 0, 0));
+		if (GetAsyncKeyState(' '))
+			view = XMMatrixMultiply(XMMatrixTranslation(0, -0.1f, 0), view);
+		if (GetAsyncKeyState(VK_SHIFT))
+			view = XMMatrixMultiply(XMMatrixTranslation(0, 0.1f, 0), view);
+		XMStoreFloat4x4(&myCBuff.vMatrix, view);
+		//projection
+		XMMATRIX temp = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
+		XMStoreFloat4x4(&myCBuff.pMatrix, temp);
 
 		// output merger
 		ID3D11RenderTargetView* tempRTV[] = { myRtv };
@@ -158,10 +193,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->RSSetViewports(1, &myPort);
 		// Input Assembler
 		myCon->IASetInputLayout(vLayout);
-		UINT strides[] = { sizeof(MyVertex) };
+		UINT strides[] = { sizeof(BaseMesh) };
 		UINT offsets[] = { 0 };
 		ID3D11Buffer* tempVB[] = { vBuff };
 		myCon->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
+		myCon->IASetIndexBuffer(iBuff, DXGI_FORMAT_R32_UINT, 0);
 		myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		// Vertex Shader Stage
 		myCon->VSSetShader(vShader, 0, 0);
@@ -174,17 +210,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// make a world, view & projection matrix
 		static float rot = 0; rot += 0.01f;
-		XMMATRIX temp = XMMatrixIdentity();
-		temp = XMMatrixTranslation(3, 2, -5);
+		temp = XMMatrixIdentity();
+		temp = XMMatrixTranslation(0, 5, 10);
 		XMMATRIX temp2 = XMMatrixRotationY(rot);
-		temp = XMMatrixMultiply(temp2, temp);
+		//temp = XMMatrixMultiply(temp2, temp);
 		XMStoreFloat4x4(&myCBuff.wMatrix, temp);
-		// view
-		temp = XMMatrixLookAtLH({ 1, 5, -10 }, { 0, 0, 0 }, { 0, 1, 0 });
-		XMStoreFloat4x4(&myCBuff.vMatrix, temp);
-		// projection
-		temp = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
-		XMStoreFloat4x4(&myCBuff.pMatrix, temp);
 
 		// Upload those matrices to the video card
 		// Create and update a constant buffer (move variable from C++ to shaders)
@@ -203,10 +233,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->PSSetConstantBuffers(0, 1, constants);
 
 		// Draw?
-		myCon->Draw(numVerts, 0);
+		myCon->DrawIndexed(procedure.indexList.size(), 0, 0);
 
 		// immediate context
-		ID3D11ShaderResourceView* texViews[] { textureRV };
+		ID3D11ShaderResourceView* texViews[]{ textureRV };
 		myCon->PSSetShaderResources(0, 1, texViews);
 		// get a more complex pre-made mesh (FBX, OBJ, custom header) _ check
 		// load it onto the card (vertex buffer, index buffer) _ check
@@ -257,6 +287,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	pMeshShader->Release();
 	textureRV->Release();
 	mTexture->Release();
+	iBuff->Release();
 
 
 	return (int)msg.wParam;
@@ -349,26 +380,27 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	myPort.MinDepth = 0;
 	myPort.MaxDepth = 1;
 
-	MyVertex tri[] = // NDC Normalized Device Coordinates
-	{ // xyzw, rgba
-		// front
-		{ {   0.0f,   1.0f,   0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
-		{ {  0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
-		{ { -0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} },
-		// right
-		{ {   0.0f,   1.0f,   0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
-		{ {  0.25f, -0.25f,  0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
-		{ {  0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} },
-		// back
-		{ {   0.0f,   1.0f,  0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
-		{ { -0.25f, -0.25f, 0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
-		{ {  0.25f, -0.25f, 0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} },
-		// left
-		{ {   0.0f,   1.0f,   0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} },
-		{ { -0.25f, -0.25f, -0.25f, 1.0f}, {1.0f, 0.0f, 1.0f, 1.0f} },
-		{ { -0.25f, -0.25f,  0.25f, 1.0f}, {1.0f, 1.0f, 0.0f, 1.0f} }
-	};
-	numVerts = ARRAYSIZE(tri);
+	int gridHeight = 10;
+	int gridWidth = 20;
+	for (int i = 0; i < gridHeight; ++i)
+	{
+		for (int j = 0; j < gridWidth; ++j)
+		{
+			procedure.vertList.push_back({ {j * 0.5f, i * 0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} });
+			if (i < gridHeight && j < gridWidth)
+			{
+				int currentIndex = (i * gridWidth) + j;
+				int upperIndex = currentIndex + gridWidth;
+				procedure.indexList.push_back(currentIndex);
+				procedure.indexList.push_back(upperIndex);
+				procedure.indexList.push_back(currentIndex + 1);
+
+				procedure.indexList.push_back(upperIndex);
+				procedure.indexList.push_back(upperIndex + 1);
+				procedure.indexList.push_back(currentIndex + 1);
+			}
+		}
+	}
 
 	// load it on the card
 	D3D11_BUFFER_DESC bDesc;
@@ -377,15 +409,21 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ZeroMemory(&subData, sizeof(subData));
 
 	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	bDesc.ByteWidth = sizeof(MyVertex) * ARRAYSIZE(tri);
+	bDesc.ByteWidth = sizeof(BaseMesh) * (procedure.vertList.size());
 	bDesc.CPUAccessFlags = 0;
 	bDesc.MiscFlags = 0;
 	bDesc.StructureByteStride = 0;
 	bDesc.Usage = D3D11_USAGE_IMMUTABLE;
 
-	subData.pSysMem = tri;
+	subData.pSysMem = procedure.vertList.data();
+	subData.SysMemPitch = 0;
+	subData.SysMemSlicePitch = 0;
 
 	hr = myDev->CreateBuffer(&bDesc, &subData, &vBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (procedure.indexList.size());
+	subData.pSysMem = procedure.indexList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &iBuff);
 
 	// write and compile & load our shaders
 
