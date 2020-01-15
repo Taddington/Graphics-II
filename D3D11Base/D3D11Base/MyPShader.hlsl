@@ -19,5 +19,6 @@ cbuffer SHADER_VARS : register(b0)
 
 float4 main(OutputVertex inputPixel) : SV_TARGET
 {
+	inputPixel.rgba += sin(inputPixel.xyzw * 0.25f * time.x);
 	return inputPixel.rgba;
 }

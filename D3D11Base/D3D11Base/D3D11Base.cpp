@@ -386,7 +386,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	{
 		for (int j = 0; j < gridWidth; ++j)
 		{
-			procedure.vertList.push_back({ {j * 0.5f, i * 0.5f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f} });
+			procedure.vertList.push_back({ {j * 0.5f, i * 0.5f, 0.0f, 1.0f}, {j / static_cast<float>(gridWidth), i / static_cast<float>(gridHeight), 0.5f, 1.0f} });
 			if (i < gridHeight && j < gridWidth)
 			{
 				int currentIndex = (i * gridWidth) + j;
