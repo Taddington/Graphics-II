@@ -52,6 +52,8 @@
     <FxCompile Include="MyVShader.hlsl" />
     <FxCompile Include="MyMeshVShader.hlsl" />
     <FxCompile Include="MyMeshPShader.hlsl" />
+    <FxCompile Include="MyLoadPShader.hlsl" />
+    <FxCompile Include="MyLoadVShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D3D11Base.cpp">

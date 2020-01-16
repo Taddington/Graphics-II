@@ -18,34 +18,41 @@ using namespace DirectX;
 #include "MyMeshVShader.csh" // don't add a .csh to you project!
 #include "MyMeshPShader.csh"
 
+#include "MyLoadVShader.csh"
+#include "MyLoadPShader.csh"
+
 // pre-made mesh
 #include "Assets/StoneHenge.h"
 #include <Windows.h>
 #include <vector>
+#include <iostream>
+#include <fstream>
+#include <atlbase.h>
 using namespace std;
 
 // for init
-ID3D11Device* myDev;
-IDXGISwapChain* mySwap;
-ID3D11DeviceContext* myCon;
+CComPtr<ID3D11Device> myDev;
+CComPtr<IDXGISwapChain> mySwap;
+CComPtr<ID3D11DeviceContext> myCon;
 
 // for drawing
-ID3D11RenderTargetView* myRtv;
+CComPtr<ID3D11RenderTargetView> myRtv;
 D3D11_VIEWPORT myPort;
 float aspectRatio = 1;
 
-struct Vertex3d
+struct SimpleVertex
 {
-	float pos[4];
-	float uvs[4];
-	float normal[4];
+	XMFLOAT3 Pos;
+	XMFLOAT3 Normal;
+	XMFLOAT2 Tex;
 };
 
-struct Mesh
+struct SimpleMesh
 {
-	vector<Vertex3d> verticesList;
+	vector<SimpleVertex> verticesList;
 	vector<int> indicesList;
 };
+SimpleMesh d20Mesh;
 
 struct MyVertex
 {
@@ -63,33 +70,41 @@ int numIndices = 0;
 unsigned int numVerts = 0;
 
 #pragma region ProceduralD3D11Interfaces
-ID3D11Buffer* vBuff;
-ID3D11Buffer* iBuff;
-ID3D11InputLayout* vLayout;
-ID3D11VertexShader* vShader; // HLSL
-ID3D11PixelShader* pShader; // HLSL
+CComPtr<ID3D11Buffer> vBuff;
+CComPtr<ID3D11Buffer> iBuff;
+CComPtr<ID3D11InputLayout> vLayout;
+CComPtr<ID3D11VertexShader> vShader; // HLSL
+CComPtr<ID3D11PixelShader> pShader; // HLSL
 #pragma endregion
 
 #pragma region StoneHengeD3D11Interfaces
 // mesh data
-ID3D11Buffer* vBuffMesh; // vertex buffer
-ID3D11Buffer* iBuffMesh; // index buffer
+CComPtr<ID3D11Buffer> vBuffMesh; // vertex buffer
+CComPtr<ID3D11Buffer> iBuffMesh; // index buffer
 
 // mesh vertex shader
-ID3D11VertexShader* vMeshShader; // HLSL
-ID3D11InputLayout* vMeshLayout;
-ID3D11PixelShader* pMeshShader; // HLSL
-#pragma endregion
-
-ID3D11Buffer* cBuff; // shader vars
-
-// X buffer for depth sorting
-ID3D11Texture2D* zBuffer;
-ID3D11DepthStencilView* zBufferView;
+CComPtr<ID3D11VertexShader> vMeshShader; // HLSL
+CComPtr<ID3D11InputLayout> vMeshLayout;
+CComPtr<ID3D11PixelShader> pMeshShader; // HLSL
 
 // texture varialbles
-ID3D11Texture2D* mTexture;
-ID3D11ShaderResourceView* textureRV;
+CComPtr<ID3D11Texture2D> mTexture;
+CComPtr<ID3D11ShaderResourceView> textureRV;
+#pragma endregion
+
+CComPtr<ID3D11InputLayout> d20MeshLayout;
+CComPtr<ID3D11Buffer> d20vBuff;
+CComPtr<ID3D11Buffer> d20iBuff;
+CComPtr<ID3D11Texture2D> d20Texture;
+CComPtr<ID3D11ShaderResourceView> d20textureRV;
+CComPtr<ID3D11VertexShader> d20vShader;
+CComPtr<ID3D11PixelShader> d20pShader;
+
+
+CComPtr<ID3D11Buffer> cBuff; // shader vars
+// X buffer for depth sorting
+CComPtr<ID3D11Texture2D> zBuffer;
+CComPtr<ID3D11DepthStencilView> zBufferView;
 
 // Math stuff
 struct ConstantBuffer
@@ -101,7 +116,7 @@ struct ConstantBuffer
 	XMFLOAT4 directionalLightColor;
 	XMFLOAT4 pointLightPos;
 	XMFLOAT4 pointLightColor;
-	XMFLOAT4 pointLightRadius = XMFLOAT4(1500.0f, 0.0f, 0.0f, 0.0f);
+	XMFLOAT4 pointLightRadius = XMFLOAT4(3.0f, 0.0f, 0.0f, 0.0f);
 	XMFLOAT4 timer = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
 };
 ConstantBuffer myCBuff;
@@ -120,6 +135,7 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+void LoadMesh(const char* meshFileName, SimpleMesh& mesh);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -168,16 +184,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		XMVECTOR dirLight = XMVectorSet(0.577f, 0.577f, -0.577f, 1.0f);
 		XMStoreFloat4(&myCBuff.directionalLightPos, dirLight);
 		myCBuff.directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
-		myCBuff.pointLightPos = XMFLOAT4(1.0f, -0.5f, 1.0f, 1.0f);
-		myCBuff.pointLightColor = XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
-		if (myCBuff.pointLightRadius.x > 2500.0f)
+		myCBuff.pointLightPos = XMFLOAT4(-8.0f, 2.0f, 3.0f, 0.0f);
+		myCBuff.pointLightColor = XMFLOAT4(2.0f, 2.0f, 0.0f, 1.0f);
+		if (myCBuff.pointLightRadius.x > 15.0f)
 			toReduceRadius = true;
-		else if (myCBuff.pointLightRadius.x < 10.0f)
+		else if (myCBuff.pointLightRadius.x < 3.0f)
 			toReduceRadius = false;
 		if (toReduceRadius)
-			myCBuff.pointLightRadius.x -= 2.5f;
+			myCBuff.pointLightRadius.x -= 0.01f;
 		else if (!toReduceRadius)
-			myCBuff.pointLightRadius.x += 2.5f;
+			myCBuff.pointLightRadius.x += 0.01f;
 #pragma endregion
 
 #pragma region ClearRenderTargetAndDepthBuffer
@@ -256,7 +272,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 
 		// immediate context
-		ID3D11ShaderResourceView* texViews[]{ textureRV };
+		ID3D11ShaderResourceView* texViews[] = { textureRV };
 		myCon->PSSetShaderResources(0, 1, texViews);
 		// get a more complex pre-made mesh (FBX, OBJ, custom header) _ check
 		// load it onto the card (vertex buffer, index buffer) _ check
@@ -288,31 +304,35 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->DrawIndexed(2532, 0, 0);
 #pragma endregion
 
+#pragma region SetupForRenderingD20
+		ID3D11ShaderResourceView* d20Views[] = { d20textureRV };
+		myCon->PSSetShaderResources(0, 1, d20Views);
+
+		myCon->IASetInputLayout(d20MeshLayout);
+		UINT d20_strides[] = { sizeof(SimpleMesh) };
+		UINT d20_offsets[] = { 0 };
+		ID3D11Buffer* d20VB[] = { d20vBuff };
+		myCon->IASetVertexBuffers(0, 1, d20VB, d20_strides, d20_offsets);
+		myCon->IASetIndexBuffer(d20iBuff, DXGI_FORMAT_R32_UINT, 0);
+
+		myCon->VSSetShader(d20vShader, 0, 0);
+		myCon->PSSetShader(d20pShader, 0, 0);
+
+		worldMatrix = XMMatrixTranslation(-5.0f, 2.0f, 4.0f);
+		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+		// send it ot the CARD
+		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+		myCon->Unmap(cBuff, 0);
+
+		// draw it
+		myCon->DrawIndexed(d20Mesh.indicesList.size(), 0, 0);
+#pragma endregion
+
 		mySwap->Present(0, 0);
 	}
-#pragma region CleanUpD3D11
-	// release all out D3D11 interfaces
-	myRtv->Release();
-	vBuff->Release();
-	myCon->Release();
-	mySwap->Release();
-	vShader->Release();
-	pShader->Release();
-	vLayout->Release();
-	myDev->Release();
-	cBuff->Release();
-	iBuffMesh->Release();
-	vBuffMesh->Release();
-	vMeshShader->Release();
-	vMeshLayout->Release();
-	zBuffer->Release();
-	zBufferView->Release();
-	pMeshShader->Release();
-	textureRV->Release();
-	mTexture->Release();
-	iBuff->Release();
-#pragma endregion
-	
+
 	return (int)msg.wParam;
 }
 
@@ -415,7 +435,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		for (int j = 0; j < gridWidth; ++j)
 		{
 			procedure.vertList.push_back({ {j * 0.5f, i * 0.5f, 0.0f, 1.0f}, {j / static_cast<float>(gridWidth), i / static_cast<float>(gridHeight), 0.5f, 1.0f} });
-			if (i < gridHeight && j < gridWidth)
+			if (i < gridHeight - 1 && j < gridWidth - 1)
 			{
 				int currentIndex = (i * gridWidth) + j;
 				int upperIndex = currentIndex + gridWidth;
@@ -517,6 +537,40 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hr = CreateDDSTextureFromFile(myDev, L"Assets/StoneHenge.dds", (ID3D11Resource**)&mTexture, &textureRV);
 #pragma endregion
 
+#pragma region d20Mesh
+	LoadMesh("Assets/d20.mesh", d20Mesh);
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (d20Mesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = d20Mesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &d20vBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (d20Mesh.indicesList.size());
+	subData.pSysMem = d20Mesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &d20iBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &d20vShader);
+	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &d20pShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC d20InputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(d20InputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &d20MeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/d20texture.dds", (ID3D11Resource**)&d20Texture, &d20textureRV);
+#pragma endregion
+
 #pragma region DepthBuffer(ZBuffer)
 	// create Z buffer & view
 	D3D11_TEXTURE2D_DESC zDesc;
@@ -604,4 +658,27 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+void LoadMesh(const char* meshFileName, SimpleMesh& mesh)
+{
+	fstream file{ meshFileName, ios_base::in | ios_base::binary };
+
+	assert(file.is_open());
+
+	uint32_t player_index_count;
+	file.read((char*)&player_index_count, sizeof(uint32_t));
+
+	mesh.indicesList.resize(player_index_count);
+
+	file.read((char*)mesh.indicesList.data(), sizeof(uint32_t) * player_index_count);
+
+	uint32_t player_vertex_count;
+	file.read((char*)&player_vertex_count, sizeof(uint32_t));
+
+	mesh.verticesList.resize(player_vertex_count);
+
+	file.read((char*)mesh.verticesList.data(), sizeof(SimpleVertex) * player_vertex_count);
+
+	file.close();
 }

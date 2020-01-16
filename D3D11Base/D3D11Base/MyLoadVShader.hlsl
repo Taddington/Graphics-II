@@ -7,8 +7,8 @@
 struct InputVertex
 {
 	float3 xyz : POSITION;
-	float3 uvw : TEXCOORD;
 	float3 nrm : NORMAL;
+	float3 uvw : TEXCOORD;
 };
 
 struct OutputVertex
