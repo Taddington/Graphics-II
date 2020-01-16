@@ -34,6 +34,19 @@ ID3D11RenderTargetView* myRtv;
 D3D11_VIEWPORT myPort;
 float aspectRatio = 1;
 
+struct Vertex3d
+{
+	float pos[4];
+	float uvs[4];
+	float normal[4];
+};
+
+struct Mesh
+{
+	vector<Vertex3d> verticesList;
+	vector<int> indicesList;
+};
+
 struct MyVertex
 {
 	float xyzw[4];
@@ -49,13 +62,15 @@ BaseMesh procedure;
 int numIndices = 0;
 unsigned int numVerts = 0;
 
+#pragma region ProceduralD3D11Interfaces
 ID3D11Buffer* vBuff;
+ID3D11Buffer* iBuff;
 ID3D11InputLayout* vLayout;
 ID3D11VertexShader* vShader; // HLSL
 ID3D11PixelShader* pShader; // HLSL
+#pragma endregion
 
-ID3D11Buffer* cBuff; // shader vars
-
+#pragma region StoneHengeD3D11Interfaces
 // mesh data
 ID3D11Buffer* vBuffMesh; // vertex buffer
 ID3D11Buffer* iBuffMesh; // index buffer
@@ -64,6 +79,9 @@ ID3D11Buffer* iBuffMesh; // index buffer
 ID3D11VertexShader* vMeshShader; // HLSL
 ID3D11InputLayout* vMeshLayout;
 ID3D11PixelShader* pMeshShader; // HLSL
+#pragma endregion
+
+ID3D11Buffer* cBuff; // shader vars
 
 // X buffer for depth sorting
 ID3D11Texture2D* zBuffer;
@@ -72,8 +90,6 @@ ID3D11DepthStencilView* zBufferView;
 // texture varialbles
 ID3D11Texture2D* mTexture;
 ID3D11ShaderResourceView* textureRV;
-
-ID3D11Buffer* iBuff;
 
 // Math stuff
 struct ConstantBuffer
@@ -110,6 +126,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
+#pragma region Win32
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
@@ -129,6 +146,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_D3D11BASE));
 
 	MSG msg;
+#pragma endregion
 
 	// Main message loop:
 	while (true)//(GetMessage(&msg, nullptr, 0, 0)) waits for message (not good)
@@ -142,15 +160,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		if (msg.message == WM_QUIT)
 			break;
 
-		// rendering here
-		float color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+#pragma region LightsAndTime
 		static float rotate = 0; rotate += 0.0025f;
 		static float timep = 0; timep += 0.0025f;
 		XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
 		XMStoreFloat4(&myCBuff.timer, time);
-		XMMATRIX rotation = XMMatrixRotationY(rotate);
 		XMVECTOR dirLight = XMVectorSet(0.577f, 0.577f, -0.577f, 1.0f);
-		dirLight = XMVector4Transform(dirLight, rotation);
 		XMStoreFloat4(&myCBuff.directionalLightPos, dirLight);
 		myCBuff.directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
 		myCBuff.pointLightPos = XMFLOAT4(1.0f, -0.5f, 1.0f, 1.0f);
@@ -163,11 +178,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			myCBuff.pointLightRadius.x -= 2.5f;
 		else if (!toReduceRadius)
 			myCBuff.pointLightRadius.x += 2.5f;
+#pragma endregion
+
+#pragma region ClearRenderTargetAndDepthBuffer
+		// rendering here
+		float color[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 		myCon->ClearRenderTargetView(myRtv, color);
 
 		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
+#pragma endregion
 
-		// Setup the pipeline
+#pragma region ViewAndProjectionMatrices
 		//view
 		if (GetAsyncKeyState('W'))
 			view = XMMatrixMultiply(view, XMMatrixTranslation(0, 0, -0.1f));
@@ -183,14 +204,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			view = XMMatrixMultiply(XMMatrixTranslation(0, 0.1f, 0), view);
 		XMStoreFloat4x4(&myCBuff.vMatrix, view);
 		//projection
-		XMMATRIX temp = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
-		XMStoreFloat4x4(&myCBuff.pMatrix, temp);
+		XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
+		XMStoreFloat4x4(&myCBuff.pMatrix, projectionMatrix);
+#pragma endregion
 
+		// Setup the pipeline
 		// output merger
 		ID3D11RenderTargetView* tempRTV[] = { myRtv };
 		myCon->OMSetRenderTargets(1, tempRTV, zBufferView);
 		// rasterizer
 		myCon->RSSetViewports(1, &myPort);
+
+#pragma region SetupForRenderingProceduralMesh
 		// Input Assembler
 		myCon->IASetInputLayout(vLayout);
 		UINT strides[] = { sizeof(BaseMesh) };
@@ -199,22 +224,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
 		myCon->IASetIndexBuffer(iBuff, DXGI_FORMAT_R32_UINT, 0);
 		myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 		// Vertex Shader Stage
 		myCon->VSSetShader(vShader, 0, 0);
 		// Pixel Shader Stage
 		myCon->PSSetShader(pShader, 0, 0);
 
-		// Try and Make your triangle 3D
-
-		// make into a pyramid (more verts)
-
-		// make a world, view & projection matrix
-		static float rot = 0; rot += 0.01f;
-		temp = XMMatrixIdentity();
-		temp = XMMatrixTranslation(0, 5, 10);
-		XMMATRIX temp2 = XMMatrixRotationY(rot);
-		//temp = XMMatrixMultiply(temp2, temp);
-		XMStoreFloat4x4(&myCBuff.wMatrix, temp);
+		// make a world matrix for each object
+		XMMATRIX worldMatrix = XMMatrixIdentity();
+		worldMatrix = XMMatrixTranslation(0, 5, 10);
+		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
 		// Upload those matrices to the video card
 		// Create and update a constant buffer (move variable from C++ to shaders)
@@ -223,7 +242,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
 		//memcpy(gpuBuffer.pData, &MyMatrices, sizeof(WVP));
 		myCon->Unmap(cBuff, 0);
-
+#pragma endregion
 
 		// Apply matrix math in Vertex Shader _ check
 		// connect constant buffer to pipeline _ check
@@ -235,6 +254,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// Draw?
 		myCon->DrawIndexed(procedure.indexList.size(), 0, 0);
 
+
 		// immediate context
 		ID3D11ShaderResourceView* texViews[]{ textureRV };
 		myCon->PSSetShaderResources(0, 1, texViews);
@@ -243,19 +263,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// make sure our shaders can process it _ check?
 		// place it somewhere else in the environment ???
 
+#pragma region SetupForRenderingStoneHengeMesh
 		// set pipeline
+		myCon->IASetInputLayout(vMeshLayout);
 		UINT mesh_strides[] = { sizeof(_OBJ_VERT_) };
 		UINT mesh_offsets[] = { 0 };
 		ID3D11Buffer* meshVB[] = { vBuffMesh };
 		myCon->IASetVertexBuffers(0, 1, meshVB, mesh_strides, mesh_offsets);
 		myCon->IASetIndexBuffer(iBuffMesh, DXGI_FORMAT_R32_UINT, 0);
+
 		myCon->VSSetShader(vMeshShader, 0, 0);
 		myCon->PSSetShader(pMeshShader, 0, 0);
-		myCon->IASetInputLayout(vMeshLayout);
 
 		// modify world matrix before drawing next thing
-		temp = XMMatrixIdentity();
-		XMStoreFloat4x4(&myCBuff.wMatrix, temp);
+		worldMatrix = XMMatrixIdentity();
+		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
 		// send it ot the CARD
 		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
 		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
@@ -263,11 +286,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// draw it
 		myCon->DrawIndexed(2532, 0, 0);
-
+#pragma endregion
 
 		mySwap->Present(0, 0);
 	}
-
+#pragma region CleanUpD3D11
 	// release all out D3D11 interfaces
 	myRtv->Release();
 	vBuff->Release();
@@ -288,8 +311,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	textureRV->Release();
 	mTexture->Release();
 	iBuff->Release();
-
-
+#pragma endregion
+	
 	return (int)msg.wParam;
 }
 
@@ -333,6 +356,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
+#pragma region Win32
 	hInst = hInstance; // Store instance handle in our global variable
 
 	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
@@ -348,7 +372,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	RECT myWinR;
 	GetClientRect(hWnd, &myWinR);
+#pragma endregion
 
+#pragma region DeviceSwapChainAndViewport
 	// attach d3d11 to our window
 	D3D_FEATURE_LEVEL dx11 = D3D_FEATURE_LEVEL_11_0;
 	DXGI_SWAP_CHAIN_DESC swap;
@@ -379,7 +405,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	myPort.TopLeftX = myPort.TopLeftY = 0;
 	myPort.MinDepth = 0;
 	myPort.MaxDepth = 1;
+#pragma endregion
 
+#pragma region ProceduralMesh
 	int gridHeight = 10;
 	int gridWidth = 20;
 	for (int i = 0; i < gridHeight; ++i)
@@ -438,7 +466,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	};
 
 	hr = myDev->CreateInputLayout(ieDesc, 2, MyVShader, sizeof(MyVShader), &vLayout);
+#pragma endregion
 
+#pragma region ConstantBuffer
 	// create constant buffer
 	ZeroMemory(&bDesc, sizeof(bDesc));
 
@@ -450,7 +480,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	bDesc.Usage = D3D11_USAGE_DYNAMIC;
 
 	hr = myDev->CreateBuffer(&bDesc, nullptr, &cBuff);
+#pragma endregion
 
+#pragma region StoneHengeMesh
 	// load our complex mesh onto the card
 	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	bDesc.ByteWidth = sizeof(StoneHenge_data);
@@ -483,7 +515,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hr = myDev->CreateInputLayout(meshInputDesc, 3, MyMeshVShader, sizeof(MyMeshVShader), &vMeshLayout);
 
 	hr = CreateDDSTextureFromFile(myDev, L"Assets/StoneHenge.dds", (ID3D11Resource**)&mTexture, &textureRV);
+#pragma endregion
 
+#pragma region DepthBuffer(ZBuffer)
 	// create Z buffer & view
 	D3D11_TEXTURE2D_DESC zDesc;
 	ZeroMemory(&zDesc, sizeof(zDesc));
@@ -499,6 +533,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hr = myDev->CreateTexture2D(&zDesc, nullptr, &zBuffer);
 
 	hr = myDev->CreateDepthStencilView(zBuffer, nullptr, &zBufferView);
+#pragma endregion
 
 	return TRUE;
 }
