@@ -38,10 +38,11 @@ cbuffer SHADER_VARS : register(b0)
 	float4 spotLightInnerConeRatio;
 };
 
-OutputVertex main(InputVertex input)
+OutputVertex main(InputVertex input, uint instanceID : SV_InstanceID)
 {
 	OutputVertex output = (OutputVertex)0;
 	output.xyzw = float4(input.xyz, 1);
+	output.xyzw.x += (2 * instanceID);
 	output.nrms.xyz = input.nrm;
 	output.uvws.xyz = input.uvw;
 	// Do math here (shader intrinsics)

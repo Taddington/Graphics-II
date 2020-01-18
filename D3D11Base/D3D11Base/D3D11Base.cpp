@@ -328,7 +328,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->VSSetShader(d20vShader, 0, 0);
 		myCon->PSSetShader(d20pShader, 0, 0);
 
-		worldMatrix = XMMatrixTranslation(-5.0f, 2.0f, 4.0f);
+		worldMatrix = XMMatrixTranslation(-5.0f, 5.0f, 4.0f);
 		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
 		// send it ot the CARD
@@ -337,7 +337,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->Unmap(cBuff, 0);
 
 		// draw it
-		myCon->DrawIndexed(d20Mesh.indicesList.size(), 0, 0);
+		myCon->DrawIndexedInstanced(d20Mesh.indicesList.size(), 5, 0, 0, 0);
 #pragma endregion
 
 		mySwap->Present(0, 0);
