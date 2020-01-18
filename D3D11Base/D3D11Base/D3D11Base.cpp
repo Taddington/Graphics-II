@@ -114,13 +114,13 @@ struct ConstantBuffer
 	XMFLOAT4X4 pMatrix;
 	XMFLOAT4 directionalLightPos = XMFLOAT4(-0.577f, -0.577f, 0.577f, 1.0f);
 	XMFLOAT4 directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
-	XMFLOAT4 pointLightPos = XMFLOAT4(-8.0f, 2.0f, 3.0f, 0.0f);
+	XMFLOAT4 pointLightPos = XMFLOAT4(-8.0f, 2.0f, 0.0f, 0.0f);
 	XMFLOAT4 pointLightColor = XMFLOAT4(2.0f, 2.0f, 0.0f, 1.0f);
-	XMFLOAT4 pointLightRadius = XMFLOAT4(3.0f, 0.0f, 0.0f, 0.0f);
+	XMFLOAT4 pointLightRadius = XMFLOAT4(9.0f, 0.0f, 0.0f, 0.0f);
 	XMFLOAT4 timer = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
-	XMFLOAT4 spotLightPos = XMFLOAT4(8.0f, 2.0f, -5.0f, 0.0f);
+	XMFLOAT4 spotLightPos = XMFLOAT4(8.0f, 2.0f, 0.0f, 0.0f);
 	XMFLOAT4 spotLightColor = XMFLOAT4(1.5f, 1.5f, 1.5f, 1.0f);
-	XMFLOAT4 spotLightDir = XMFLOAT4(0.0f, -0.5f, 0.35f, 1.0f);
+	XMFLOAT4 spotLightDir = XMFLOAT4(0.0f, -0.5f, 0.0f, 1.0f);
 	XMFLOAT4 spotLightOuterConeRatio = XMFLOAT4(0.4f, 0.0f, 0.0f, 0.0f);
 	XMFLOAT4 spotLightInnerConeRatio = XMFLOAT4(0.5f, 0.0f, 0.0f, 0.0f);
 };
@@ -191,9 +191,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		else if (myCBuff.pointLightRadius.x < 3.0f)
 			toReduceRadius = false;
 		if (toReduceRadius)
+		{
 			myCBuff.pointLightRadius.x -= 0.01f;
+			myCBuff.pointLightPos.z -= 0.01f;
+			myCBuff.spotLightPos.z -= 0.025f;
+			myCBuff.spotLightDir.z += 0.001f;
+		}
 		else if (!toReduceRadius)
+		{
 			myCBuff.pointLightRadius.x += 0.01f;
+			myCBuff.pointLightPos.z += 0.01f;
+			myCBuff.spotLightPos.z += 0.025f;
+			myCBuff.spotLightDir.z -= 0.001f;
+		}
 #pragma endregion
 
 #pragma region ClearRenderTargetAndDepthBuffer
