@@ -15,6 +15,11 @@ cbuffer SHADER_VARS : register(b0)
 	float4 pointLightColor;
 	float4 pointLightRadius;
 	float4 time;
+	float4 spotLightPos;
+	float4 spotLightColor;
+	float4 spotLightDir;
+	float4 spotLightOuterConeRatio;
+	float4 spotLightInnerConeRatio;
 };
 
 float4 main(OutputVertex inputPixel) : SV_TARGET

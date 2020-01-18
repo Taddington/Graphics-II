@@ -112,12 +112,17 @@ struct ConstantBuffer
 	XMFLOAT4X4 wMatrix; // storage type
 	XMFLOAT4X4 vMatrix;
 	XMFLOAT4X4 pMatrix;
-	XMFLOAT4 directionalLightPos;
-	XMFLOAT4 directionalLightColor;
-	XMFLOAT4 pointLightPos;
-	XMFLOAT4 pointLightColor;
+	XMFLOAT4 directionalLightPos = XMFLOAT4(-0.577f, -0.577f, 0.577f, 1.0f);
+	XMFLOAT4 directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
+	XMFLOAT4 pointLightPos = XMFLOAT4(-8.0f, 2.0f, 3.0f, 0.0f);
+	XMFLOAT4 pointLightColor = XMFLOAT4(2.0f, 2.0f, 0.0f, 1.0f);
 	XMFLOAT4 pointLightRadius = XMFLOAT4(3.0f, 0.0f, 0.0f, 0.0f);
 	XMFLOAT4 timer = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+	XMFLOAT4 spotLightPos = XMFLOAT4(8.0f, 2.0f, -5.0f, 0.0f);
+	XMFLOAT4 spotLightColor = XMFLOAT4(1.5f, 1.5f, 1.5f, 1.0f);
+	XMFLOAT4 spotLightDir = XMFLOAT4(0.0f, -0.5f, 0.35f, 1.0f);
+	XMFLOAT4 spotLightOuterConeRatio = XMFLOAT4(0.4f, 0.0f, 0.0f, 0.0f);
+	XMFLOAT4 spotLightInnerConeRatio = XMFLOAT4(0.5f, 0.0f, 0.0f, 0.0f);
 };
 ConstantBuffer myCBuff;
 XMMATRIX view = XMMatrixLookAtLH({ 1, 5, -10 }, { 0, 0, 0 }, { 0, 1, 0 });
@@ -181,11 +186,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		static float timep = 0; timep += 0.0025f;
 		XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
 		XMStoreFloat4(&myCBuff.timer, time);
-		XMVECTOR dirLight = XMVectorSet(0.577f, 0.577f, -0.577f, 1.0f);
-		XMStoreFloat4(&myCBuff.directionalLightPos, dirLight);
-		myCBuff.directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
-		myCBuff.pointLightPos = XMFLOAT4(-8.0f, 2.0f, 3.0f, 0.0f);
-		myCBuff.pointLightColor = XMFLOAT4(2.0f, 2.0f, 0.0f, 1.0f);
 		if (myCBuff.pointLightRadius.x > 15.0f)
 			toReduceRadius = true;
 		else if (myCBuff.pointLightRadius.x < 3.0f)
