@@ -52,7 +52,7 @@ struct SimpleMesh
 	vector<SimpleVertex> verticesList;
 	vector<int> indicesList;
 };
-SimpleMesh d20Mesh;
+SimpleMesh crystalMesh;
 
 struct MyVertex
 {
@@ -92,13 +92,13 @@ CComPtr<ID3D11Texture2D> mTexture;
 CComPtr<ID3D11ShaderResourceView> textureRV;
 #pragma endregion
 
-CComPtr<ID3D11InputLayout> d20MeshLayout;
-CComPtr<ID3D11Buffer> d20vBuff;
-CComPtr<ID3D11Buffer> d20iBuff;
-CComPtr<ID3D11Texture2D> d20Texture;
-CComPtr<ID3D11ShaderResourceView> d20textureRV;
-CComPtr<ID3D11VertexShader> d20vShader;
-CComPtr<ID3D11PixelShader> d20pShader;
+CComPtr<ID3D11InputLayout> crystalMeshLayout;
+CComPtr<ID3D11Buffer> crystalvBuff;
+CComPtr<ID3D11Buffer> crystaliBuff;
+CComPtr<ID3D11Texture2D> crystalTexture;
+CComPtr<ID3D11ShaderResourceView> crystaltextureRV;
+CComPtr<ID3D11VertexShader> crystalvShader;
+CComPtr<ID3D11PixelShader> crystalpShader;
 
 
 CComPtr<ID3D11Buffer> cBuff; // shader vars
@@ -258,7 +258,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// make a world matrix for each object
 		XMMATRIX worldMatrix = XMMatrixIdentity();
-		worldMatrix = XMMatrixTranslation(0, 5, 10);
+		worldMatrix = XMMatrixTranslation(0, 5, 20);
 		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
 		// Upload those matrices to the video card
@@ -315,20 +315,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 #pragma endregion
 
 #pragma region SetupForRenderingD20
-		ID3D11ShaderResourceView* d20Views[] = { d20textureRV };
-		myCon->PSSetShaderResources(0, 1, d20Views);
+		ID3D11ShaderResourceView* crystalViews[] = { crystaltextureRV };
+		myCon->PSSetShaderResources(0, 1, crystalViews);
 
-		myCon->IASetInputLayout(d20MeshLayout);
-		UINT d20_strides[] = { sizeof(SimpleMesh) };
-		UINT d20_offsets[] = { 0 };
-		ID3D11Buffer* d20VB[] = { d20vBuff };
-		myCon->IASetVertexBuffers(0, 1, d20VB, d20_strides, d20_offsets);
-		myCon->IASetIndexBuffer(d20iBuff, DXGI_FORMAT_R32_UINT, 0);
+		myCon->IASetInputLayout(crystalMeshLayout);
+		UINT crystal_strides[] = { sizeof(SimpleMesh) };
+		UINT crystal_offsets[] = { 0 };
+		ID3D11Buffer* crystalVB[] = { crystalvBuff };
+		myCon->IASetVertexBuffers(0, 1, crystalVB, crystal_strides, crystal_offsets);
+		myCon->IASetIndexBuffer(crystaliBuff, DXGI_FORMAT_R32_UINT, 0);
 
-		myCon->VSSetShader(d20vShader, 0, 0);
-		myCon->PSSetShader(d20pShader, 0, 0);
+		myCon->VSSetShader(crystalvShader, 0, 0);
+		myCon->PSSetShader(crystalpShader, 0, 0);
 
-		worldMatrix = XMMatrixTranslation(-5.0f, 5.0f, 4.0f);
+		worldMatrix = XMMatrixTranslation(-15.0f, 3.0f, 4.0f);
 		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
 		// send it ot the CARD
@@ -337,7 +337,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->Unmap(cBuff, 0);
 
 		// draw it
-		myCon->DrawIndexedInstanced(d20Mesh.indicesList.size(), 5, 0, 0, 0);
+		myCon->DrawIndexedInstanced(crystalMesh.indicesList.size(), 5, 0, 0, 0);
 #pragma endregion
 
 		mySwap->Present(0, 0);
@@ -548,25 +548,25 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 #pragma endregion
 
 #pragma region d20Mesh
-	LoadMesh("Assets/d20.mesh", d20Mesh);
+	LoadMesh("Assets/Crystal.mesh", crystalMesh);
 	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	bDesc.ByteWidth = sizeof(SimpleMesh) * (d20Mesh.verticesList.size());
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (crystalMesh.verticesList.size());
 	bDesc.CPUAccessFlags = 0;
 	bDesc.MiscFlags = 0;
 	bDesc.StructureByteStride = 0;
 	bDesc.Usage = D3D11_USAGE_DEFAULT;
 
-	subData.pSysMem = d20Mesh.verticesList.data();
+	subData.pSysMem = crystalMesh.verticesList.data();
 
-	hr = myDev->CreateBuffer(&bDesc, &subData, &d20vBuff);
+	hr = myDev->CreateBuffer(&bDesc, &subData, &crystalvBuff);
 	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	bDesc.ByteWidth = sizeof(int) * (d20Mesh.indicesList.size());
-	subData.pSysMem = d20Mesh.indicesList.data();
-	hr = myDev->CreateBuffer(&bDesc, &subData, &d20iBuff);
+	bDesc.ByteWidth = sizeof(int) * (crystalMesh.indicesList.size());
+	subData.pSysMem = crystalMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &crystaliBuff);
 
 	// load our new mesh shader
-	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &d20vShader);
-	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &d20pShader);
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &crystalvShader);
+	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &crystalpShader);
 
 	// make matching input layout for mesh vertex
 	D3D11_INPUT_ELEMENT_DESC d20InputDesc[] =
@@ -576,9 +576,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
-	hr = myDev->CreateInputLayout(d20InputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &d20MeshLayout);
+	hr = myDev->CreateInputLayout(d20InputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &crystalMeshLayout);
 
-	hr = CreateDDSTextureFromFile(myDev, L"Assets/d20texture.dds", (ID3D11Resource**)&d20Texture, &d20textureRV);
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/icium.dds", (ID3D11Resource**)&crystalTexture, &crystaltextureRV);
 #pragma endregion
 
 #pragma region DepthBuffer(ZBuffer)
