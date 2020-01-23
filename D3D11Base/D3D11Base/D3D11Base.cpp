@@ -141,7 +141,7 @@ struct ConstantBuffer
 	XMFLOAT4 spotLightInnerConeRatio = XMFLOAT4(0.5f, 0.0f, 0.0f, 0.0f);
 };
 ConstantBuffer myCBuff;
-XMMATRIX view = XMMatrixLookAtLH({ 1, 5, -10 }, { 0, 0, 0 }, { 0, 1, 0 });
+XMMATRIX view;
 bool toReduceRadius = false;
 
 #define MAX_LOADSTRING 100
@@ -232,19 +232,48 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 #pragma region ViewAndProjectionMatrices
 		//view
+		float localX = 0.0f;
+		float localZ = 0.0f;
+		float globalY = 0.0f;
+		float yRot = 0.0f;
+		float xRot = 0.0f;
+		if (GetAsyncKeyState(VK_LEFT))
+			yRot -= 0.01f;
+		if (GetAsyncKeyState(VK_RIGHT))
+			yRot += 0.01f;
+		if (GetAsyncKeyState(VK_DOWN))
+			xRot += 0.01f;
+		if (GetAsyncKeyState(VK_UP))
+			xRot -= 0.01f;
 		if (GetAsyncKeyState('W'))
-			view = XMMatrixMultiply(view, XMMatrixTranslation(0, 0, -0.1f));
+			localZ += 0.1f;
 		if (GetAsyncKeyState('S'))
-			view = XMMatrixMultiply(view, XMMatrixTranslation(0, 0, 0.1f));
+			localZ -= 0.1f;
 		if (GetAsyncKeyState('A'))
-			view = XMMatrixMultiply(view, XMMatrixTranslation(0.1f, 0, 0));
+			localX -= 0.1f;
 		if (GetAsyncKeyState('D'))
-			view = XMMatrixMultiply(view, XMMatrixTranslation(-0.1f, 0, 0));
-		if (GetAsyncKeyState(' '))
-			view = XMMatrixMultiply(XMMatrixTranslation(0, -0.1f, 0), view);
+			localX += 0.1f;
+		if (GetAsyncKeyState(VK_SPACE))
+			globalY += 0.1f;
 		if (GetAsyncKeyState(VK_SHIFT))
-			view = XMMatrixMultiply(XMMatrixTranslation(0, 0.1f, 0), view);
-		XMStoreFloat4x4(&myCBuff.vMatrix, view);
+			globalY -= 0.1f;
+
+		XMMATRIX translation = XMMatrixTranslation(localX, 0.0f, localZ);
+		view = XMMatrixMultiply(translation, view);
+		translation = XMMatrixTranslation(0.0f, globalY, 0.0f);
+		view = XMMatrixMultiply(view, translation);
+
+		XMVECTOR temp = view.r[3];
+		view.r[3] = XMMatrixIdentity().r[3];
+		translation = XMMatrixRotationY(yRot);
+		view = XMMatrixMultiply(view, translation);
+		view.r[3] = temp;
+
+		translation = XMMatrixRotationX(xRot);
+		view = XMMatrixMultiply(translation, view);
+
+		XMMATRIX camera = DirectX::XMMatrixInverse(nullptr, view);
+		XMStoreFloat4x4(&myCBuff.vMatrix, camera);
 		//projection
 		XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
 		XMStoreFloat4x4(&myCBuff.pMatrix, projectionMatrix);
@@ -272,7 +301,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		myCon->VSSetShader(skyboxvShader, 0, 0);
 		myCon->PSSetShader(skyboxpShader, 0, 0);
 
-		XMMATRIX worldMatrix = XMMatrixTranslationFromVector(XMMatrixInverse(0, view).r[3]);
+		XMMATRIX worldMatrix = XMMatrixTranslationFromVector(XMMatrixInverse(0, camera).r[3]);
 		//worldMatrix = XMMatrixTranslation(0, 10, 0);
 		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
@@ -547,6 +576,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 #pragma region ConstantBuffer
 	// create constant buffer
+	view = XMMatrixTranslation(0, 5, -10);
+
 	ZeroMemory(&bDesc, sizeof(bDesc));
 
 	bDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -633,27 +664,34 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		{{ 1.0f, -1.0f,  1.0f } },
 		{{ 1.0f,  1.0f,  1.0f } },
 		{{ 1.0f,  1.0f, -1.0f } },
+
 		{{ 1.0f, -1.0f, -1.0f } },
 		{{-1.0f, -1.0f, -1.0f } },
 		{{-1.0f,  1.0f, -1.0f } },
+
 		{{-1.0f,  1.0f,  1.0f } },
 		{{-1.0f, -1.0f,  1.0f } },
 		{{-1.0f, -1.0f,  1.0f } },
+
 		{{ 1.0f, -1.0f,  1.0f } },
 		{{ 1.0f, -1.0f, -1.0f } },
 		{{-1.0f, -1.0f, -1.0f } },
+
 		{{ 1.0f,  1.0f, -1.0f } },
 		{{ 1.0f,  1.0f,  1.0f } },
 		{{-1.0f,  1.0f,  1.0f } },
+
 		{{-1.0f,  1.0f, -1.0f } },
 		{{-1.0f,  1.0f,  1.0f } },
 		{{ 1.0f,  1.0f,  1.0f } },
+
 		{{ 1.0f, -1.0f,  1.0f } },
 		{{-1.0f, -1.0f,  1.0f } },
 		{{ 1.0f, -1.0f, -1.0f } },
+
 		{{ 1.0f,  1.0f, -1.0f } },
-		{{-1.0f, -1.0f, -1.0f } },
-		{{-1.0f,  1.0f, -1.0f } }
+		{{-1.0f,  1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } }
 		
 	};
 
