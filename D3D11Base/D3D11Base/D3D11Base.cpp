@@ -157,6 +157,7 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 void LoadMesh(const char* meshFileName, SimpleMesh& mesh);
+HWND window;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -196,6 +197,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		}
 		if (msg.message == WM_QUIT)
 			break;
+
+		RECT rect;
+		GetClientRect(window, &rect);
+		aspectRatio =  (rect.right - rect.left) / float(rect.bottom - rect.top);
 
 #pragma region LightsAndTime
 		static float rotate = 0; rotate += 0.0025f;
@@ -478,6 +483,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	RECT myWinR;
 	GetClientRect(hWnd, &myWinR);
+	window = hWnd;
 #pragma endregion
 
 #pragma region DeviceSwapChainAndViewport
