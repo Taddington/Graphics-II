@@ -30,5 +30,5 @@ struct OutputVertex
 
 float4 main(OutputVertex inputPixel) : SV_TARGET
 {
-	return txDiffuse.Sample(samLinear, inputPixel.worldpos.xyz);
+	return txDiffuse.Sample(samLinear, inputPixel.worldpos);
 }

@@ -115,7 +115,6 @@ CComPtr<ID3D11ShaderResourceView> skyboxtextureRV;
 CComPtr<ID3D11VertexShader> skyboxvShader;
 CComPtr<ID3D11PixelShader> skyboxpShader;
 CComPtr<ID3D11DepthStencilState> skyState;
-CComPtr<ID3D11RasterizerState> skyRasState;
 #pragma endregion
 
 CComPtr<ID3D11Buffer> cBuff; // shader vars
@@ -258,33 +257,40 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// rasterizer
 		myCon->RSSetViewports(1, &myPort);
 
-		//ID3D11ShaderResourceView* SkyboxViews[] = { skyboxtextureRV };
-		//myCon->PSSetShaderResources(0, 1, SkyboxViews);
+#pragma region SetupForRenderingSkybox
+		ID3D11ShaderResourceView* SkyboxViews[] = { skyboxtextureRV };
+		myCon->PSSetShaderResources(0, 1, SkyboxViews);
 
-		//myCon->IASetInputLayout(skyboxMeshLayout);
-		//UINT skybox_strides[] = { sizeof(SimpleMesh) };
-		//UINT skybox_offsets[] = { 0 };
-		//ID3D11Buffer* skyboxVB[] = { skyboxvBuff };
-		//myCon->IASetVertexBuffers(0, 1, skyboxVB, skybox_strides, skybox_offsets);
-		//myCon->IASetIndexBuffer(skyboxiBuff, DXGI_FORMAT_R32_UINT, 0);
-		//myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		myCon->IASetInputLayout(skyboxMeshLayout);
+		UINT skybox_strides[] = { sizeof(SimpleMesh) };
+		UINT skybox_offsets[] = { 0 };
+		ID3D11Buffer* skyboxVB[] = { skyboxvBuff };
+		myCon->IASetVertexBuffers(0, 1, skyboxVB, skybox_strides, skybox_offsets);
+		myCon->IASetIndexBuffer(skyboxiBuff, DXGI_FORMAT_R32_UINT, 0);
+		myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		//myCon->VSSetShader(skyboxvShader, 0, 0);
-		//myCon->PSSetShader(skyboxpShader, 0, 0);
+		myCon->VSSetShader(skyboxvShader, 0, 0);
+		myCon->PSSetShader(skyboxpShader, 0, 0);
 
-		XMMATRIX worldMatrix = XMMatrixTranslationFromVector(view.r[3]);
-		//XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+		XMMATRIX worldMatrix = XMMatrixTranslationFromVector(XMMatrixInverse(0, view).r[3]);
+		//worldMatrix = XMMatrixTranslation(0, 10, 0);
+		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
-		//// send it ot the CARD
+		// send it ot the CARD
 		D3D11_MAPPED_SUBRESOURCE gpuBuffer;
-		//HRESULT	hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		//*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
-		//myCon->Unmap(cBuff, 0);
+		HRESULT	hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+		myCon->Unmap(cBuff, 0);
 
-		//// draw it
-		//myCon->DrawIndexed(skyboxMesh.indicesList.size(), 0, 0);
+		ID3D11Buffer* constants[] = { cBuff };
+		myCon->VSSetConstantBuffers(0, 1, constants);
+		myCon->PSSetConstantBuffers(0, 1, constants);
 
-		//myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
+		// draw it
+		myCon->DrawIndexed(skyboxMesh.indicesList.size(), 0, 0);
+
+		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
+#pragma endregion
 
 #pragma region SetupForRenderingProceduralMesh
 		// Input Assembler
@@ -308,7 +314,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		// Upload those matrices to the video card
 		// Create and update a constant buffer (move variable from C++ to shaders)
-		HRESULT hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
 		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
 		//memcpy(gpuBuffer.pData, &MyMatrices, sizeof(WVP));
 		myCon->Unmap(cBuff, 0);
@@ -317,9 +323,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// Apply matrix math in Vertex Shader _ check
 		// connect constant buffer to pipeline _ check
 		// remember by default HLSL matrices are COLUMN MAJOR
-		ID3D11Buffer* constants[] = { cBuff };
-		myCon->VSSetConstantBuffers(0, 1, constants);
-		myCon->PSSetConstantBuffers(0, 1, constants);
 
 		// Draw?
 		myCon->DrawIndexed(procedure.indexList.size(), 0, 0);
@@ -625,88 +628,89 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hr = CreateDDSTextureFromFile(myDev, L"Assets/icium.dds", (ID3D11Resource**)&crystalTexture, &crystaltextureRV);
 #pragma endregion
 
-//#pragma region SkyBox
-//	skyboxMesh.verticesList = {
-//		{{-1.0f,  1.0f, -1.0f } },
-//		{{-1.0f, -1.0f, -1.0f } },
-//		{{ 1.0f,  1.0f, -1.0f } },
-//		{{ 1.0f, -1.0f, -1.0f } },
-//		{{-1.0f, -1.0f,  1.0f } },
-//		{{ 1.0f, -1.0f,  1.0f } },
-//		{{ 1.0f,  1.0f,  1.0f } },
-//		{{-1.0f,  1.0f,  1.0f } },
-//		{{-1.0f,  1.0f, -1.0f } },
-//		{{-1.0f,  1.0f,  1.0f } },
-//		{{ 1.0f,  1.0f,  1.0f } },
-//		{{ 1.0f,  1.0f, -1.0f } },
-//		{{-1.0f, -1.0f, -1.0f } },
-//		{{ 1.0f, -1.0f, -1.0f } },
-//		{{ 1.0f, -1.0f,  1.0f } },
-//		{{-1.0f, -1.0f,  1.0f } },
-//		{{-1.0f, -1.0f,  1.0f } },
-//		{{-1.0f,  1.0f,  1.0f } },
-//		{{-1.0f,  1.0f, -1.0f } },
-//		{{-1.0f, -1.0f, -1.0f } },
-//		{{ 1.0f, -1.0f, -1.0f } },
-//		{{ 1.0f,  1.0f, -1.0f } },
-//		{{ 1.0f,  1.0f,  1.0f } },
-//		{{ 1.0f, -1.0f,  1.0f } },
-//	};
-//
-//	skyboxMesh.indicesList = {
-//		0,  1,  2,
-//		0,  2,  3,
-//		4,  5,  6,
-//		4,  6,  7,
-//		8,  9, 10,
-//		8, 10, 11,
-//		12, 13, 14,
-//		12, 14, 15,
-//		16, 17, 18,
-//		16, 18, 19,
-//		20, 21, 22,
-//		20, 22, 23
-//	};
-//
-//	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-//	bDesc.ByteWidth = sizeof(SimpleMesh) * (skyboxMesh.verticesList.size());
-//	bDesc.CPUAccessFlags = 0;
-//	bDesc.MiscFlags = 0;
-//	bDesc.StructureByteStride = 0;
-//	bDesc.Usage = D3D11_USAGE_DEFAULT;
-//
-//	subData.pSysMem = skyboxMesh.verticesList.data();
-//
-//	hr = myDev->CreateBuffer(&bDesc, &subData, &skyboxvBuff);
-//	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-//	bDesc.ByteWidth = sizeof(int) * (skyboxMesh.indicesList.size());
-//	subData.pSysMem = skyboxMesh.indicesList.data();
-//	hr = myDev->CreateBuffer(&bDesc, &subData, &skyboxiBuff);
-//
-//	// load our new mesh shader
-//	hr = myDev->CreateVertexShader(MySkyboxVShader, sizeof(MySkyboxVShader), nullptr, &skyboxvShader);
-//	hr = myDev->CreatePixelShader(MySkyboxPShader, sizeof(MySkyboxPShader), nullptr, &skyboxpShader);
-//
-//	// make matching input layout for mesh vertex
-//	D3D11_INPUT_ELEMENT_DESC skyboxInputDesc[] =
-//	{
-//		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-//		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-//		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
-//	};
-//
-//	hr = myDev->CreateInputLayout(skyboxInputDesc, 3, MySkyboxVShader, sizeof(MySkyboxVShader), &skyboxMeshLayout);
-//
-//	hr = CreateDDSTextureFromFile(myDev, L"Assets/SkyboxOcean.dds", (ID3D11Resource**)&skyboxTexture, &skyboxtextureRV);
-//
-//	D3D11_DEPTH_STENCIL_DESC dssDesc;
-//	ZeroMemory(&dssDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
-//	dssDesc.DepthEnable = true;
-//	dssDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-//	dssDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-//
-//	myDev->CreateDepthStencilState(&dssDesc, &skyState);
-//#pragma endregion
+#pragma region SkyBox
+	skyboxMesh.verticesList = {
+		{{ 1.0f, -1.0f,  1.0f } },
+		{{ 1.0f,  1.0f,  1.0f } },
+		{{ 1.0f,  1.0f, -1.0f } },
+		{{ 1.0f, -1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } },
+		{{-1.0f,  1.0f, -1.0f } },
+		{{-1.0f,  1.0f,  1.0f } },
+		{{-1.0f, -1.0f,  1.0f } },
+		{{-1.0f, -1.0f,  1.0f } },
+		{{ 1.0f, -1.0f,  1.0f } },
+		{{ 1.0f, -1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } },
+		{{ 1.0f,  1.0f, -1.0f } },
+		{{ 1.0f,  1.0f,  1.0f } },
+		{{-1.0f,  1.0f,  1.0f } },
+		{{-1.0f,  1.0f, -1.0f } },
+		{{-1.0f,  1.0f,  1.0f } },
+		{{ 1.0f,  1.0f,  1.0f } },
+		{{ 1.0f, -1.0f,  1.0f } },
+		{{-1.0f, -1.0f,  1.0f } },
+		{{ 1.0f, -1.0f, -1.0f } },
+		{{ 1.0f,  1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } },
+		{{-1.0f,  1.0f, -1.0f } }
+		
+	};
+
+	skyboxMesh.indicesList = {
+		0,  1,  2,
+		0,  2,  3,
+		4,  5,  6,
+		4,  6,  7,
+		8,  9, 10,
+		8, 10, 11,
+		12, 13, 14,
+		12, 14, 15,
+		16, 17, 18,
+		16, 18, 19,
+		20, 21, 22,
+		20, 22, 23
+	};
+
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (skyboxMesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = skyboxMesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &skyboxvBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (skyboxMesh.indicesList.size());
+	subData.pSysMem = skyboxMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &skyboxiBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MySkyboxVShader, sizeof(MySkyboxVShader), nullptr, &skyboxvShader);
+	hr = myDev->CreatePixelShader(MySkyboxPShader, sizeof(MySkyboxPShader), nullptr, &skyboxpShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC skyboxInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(skyboxInputDesc, 3, MySkyboxVShader, sizeof(MySkyboxVShader), &skyboxMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/SkyboxOcean.dds", (ID3D11Resource**)&skyboxTexture, &skyboxtextureRV);
+
+	D3D11_DEPTH_STENCIL_DESC dssDesc;
+	ZeroMemory(&dssDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+	dssDesc.DepthEnable = true;
+	dssDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	dssDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+
+	myDev->CreateDepthStencilState(&dssDesc, &skyState);
+#pragma endregion
 
 #pragma region DepthBuffer(ZBuffer)
 	// create Z buffer & view

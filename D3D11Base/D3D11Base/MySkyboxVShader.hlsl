@@ -44,10 +44,10 @@ OutputVertex main(InputVertex input)
 	output.xyzw = float4(input.xyz, 1);
 	// Do math here (shader intrinsics)
 
-	output.xyzw = mul(worldMatrix, output.xyzw);
 	output.worldpos = output.xyzw;
+	output.xyzw = mul(worldMatrix, output.xyzw);
 	output.xyzw = mul(viewMatrix, output.xyzw);
-	output.xyzw = mul(projectionMatrix, output.xyzw).xyww;
+	output.xyzw = mul(projectionMatrix, output.xyzw);
 	// don't do perspective divide
 
 	return output;
