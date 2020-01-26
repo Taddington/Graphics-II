@@ -143,6 +143,9 @@ struct ConstantBuffer
 ConstantBuffer myCBuff;
 XMMATRIX view;
 bool toReduceRadius = false;
+float nearPlane = 0.1f;
+float farPlane = 75.0f;
+float FOV = 2.0f;
 
 #define MAX_LOADSTRING 100
 
@@ -262,6 +265,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			globalY += 0.1f;
 		if (GetAsyncKeyState(VK_SHIFT))
 			globalY -= 0.1f;
+		if (GetAsyncKeyState('U') && nearPlane < 50.0f)
+			nearPlane += 0.1f;
+		if (GetAsyncKeyState('J') && nearPlane > 0.1f)
+			nearPlane -= 0.1f;
+		if (GetAsyncKeyState('I') && farPlane < 75.0f)
+			farPlane += 0.1f;
+		if (GetAsyncKeyState('K') && farPlane > 20.0f)
+			farPlane -= 0.1f;
+		if (GetAsyncKeyState('O') && FOV < 15.0f)
+			FOV += 0.01f;
+		if (GetAsyncKeyState('L') && FOV > 2.0f)
+			FOV -= 0.01f;
 
 		XMMATRIX translation = XMMatrixTranslation(localX, 0.0f, localZ);
 		view = XMMatrixMultiply(translation, view);
@@ -280,7 +295,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		XMMATRIX camera = DirectX::XMMatrixInverse(nullptr, view);
 		XMStoreFloat4x4(&myCBuff.vMatrix, camera);
 		//projection
-		XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(3.14f / 2.0f, aspectRatio, 0.1f, 1000);
+		XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(3.14f / FOV, aspectRatio, nearPlane, farPlane);
 		XMStoreFloat4x4(&myCBuff.pMatrix, projectionMatrix);
 #pragma endregion
 
