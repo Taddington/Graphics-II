@@ -57,6 +57,8 @@ struct SimpleMesh
 };
 SimpleMesh crystalMesh;
 SimpleMesh skyboxMesh;
+SimpleMesh skybox2Mesh;
+SimpleMesh spaceShipMesh;
 
 struct MyVertex
 {
@@ -106,6 +108,16 @@ CComPtr<ID3D11VertexShader> crystalvShader;
 CComPtr<ID3D11PixelShader> crystalpShader;
 #pragma endregion
 
+#pragma region SpaceShipMesh
+CComPtr<ID3D11InputLayout> spaceShipMeshLayout;
+CComPtr<ID3D11Buffer> spaceShipvBuff;
+CComPtr<ID3D11Buffer> spaceShipiBuff;
+CComPtr<ID3D11Texture2D> spaceShipTexture;
+CComPtr<ID3D11ShaderResourceView> spaceShiptextureRV;
+CComPtr<ID3D11VertexShader> spaceShipvShader;
+CComPtr<ID3D11PixelShader> spaceShippShader;
+#pragma endregion
+
 #pragma region Skybox
 CComPtr<ID3D11InputLayout> skyboxMeshLayout;
 CComPtr<ID3D11Buffer> skyboxvBuff;
@@ -115,6 +127,17 @@ CComPtr<ID3D11ShaderResourceView> skyboxtextureRV;
 CComPtr<ID3D11VertexShader> skyboxvShader;
 CComPtr<ID3D11PixelShader> skyboxpShader;
 CComPtr<ID3D11DepthStencilState> skyState;
+#pragma endregion
+
+#pragma region Skybox2
+CComPtr<ID3D11InputLayout> skybox2MeshLayout;
+CComPtr<ID3D11Buffer> skybox2vBuff;
+CComPtr<ID3D11Buffer> skybox2iBuff;
+CComPtr<ID3D11Texture2D> skybox2Texture;
+CComPtr<ID3D11ShaderResourceView> skybox2textureRV;
+CComPtr<ID3D11VertexShader> skybox2vShader;
+CComPtr<ID3D11PixelShader> skybox2pShader;
+CComPtr<ID3D11DepthStencilState> sky2State;
 #pragma endregion
 
 CComPtr<ID3D11Buffer> cBuff; // shader vars
@@ -146,6 +169,8 @@ bool toReduceRadius = false;
 float nearPlane = 0.1f;
 float farPlane = 75.0f;
 float FOV = 2.0f;
+
+bool toSwitchScenes = false;
 
 #define MAX_LOADSTRING 100
 
@@ -203,32 +228,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		RECT rect;
 		GetClientRect(window, &rect);
-		aspectRatio =  (rect.right - rect.left) / float(rect.bottom - rect.top);
-
-#pragma region LightsAndTime
-		static float rotate = 0; rotate += 0.0025f;
-		static float timep = 0; timep += 0.0025f;
-		XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
-		XMStoreFloat4(&myCBuff.timer, time);
-		if (myCBuff.pointLightRadius.x > 15.0f)
-			toReduceRadius = true;
-		else if (myCBuff.pointLightRadius.x < 3.0f)
-			toReduceRadius = false;
-		if (toReduceRadius)
-		{
-			myCBuff.pointLightRadius.x -= 0.01f;
-			myCBuff.pointLightPos.z -= 0.01f;
-			myCBuff.spotLightPos.z -= 0.025f;
-			myCBuff.spotLightDir.z += 0.001f;
-		}
-		else if (!toReduceRadius)
-		{
-			myCBuff.pointLightRadius.x += 0.01f;
-			myCBuff.pointLightPos.z += 0.01f;
-			myCBuff.spotLightPos.z += 0.025f;
-			myCBuff.spotLightDir.z -= 0.001f;
-		}
-#pragma endregion
+		aspectRatio = (rect.right - rect.left) / float(rect.bottom - rect.top);
 
 #pragma region ClearRenderTargetAndDepthBuffer
 		// rendering here
@@ -267,16 +267,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			globalY -= 0.1f;
 		if (GetAsyncKeyState('U') && nearPlane < 50.0f)
 			nearPlane += 0.1f;
-		if (GetAsyncKeyState('J') && nearPlane > 0.1f)
+		if (GetAsyncKeyState('J') && nearPlane > 0.15f)
 			nearPlane -= 0.1f;
-		if (GetAsyncKeyState('I') && farPlane < 75.0f)
-			farPlane += 0.1f;
+		if (GetAsyncKeyState('I') && farPlane < 1000.0f)
+			farPlane += 1.0f;
 		if (GetAsyncKeyState('K') && farPlane > 20.0f)
-			farPlane -= 0.1f;
+			farPlane -= 1.0f;
 		if (GetAsyncKeyState('O') && FOV < 15.0f)
-			FOV += 0.01f;
+			FOV += 0.1f;
 		if (GetAsyncKeyState('L') && FOV > 2.0f)
-			FOV -= 0.01f;
+			FOV -= 0.1f;
 
 		XMMATRIX translation = XMMatrixTranslation(localX, 0.0f, localZ);
 		view = XMMatrixMultiply(translation, view);
@@ -306,135 +306,259 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		// rasterizer
 		myCon->RSSetViewports(1, &myPort);
 
+		if (GetAsyncKeyState('1'))
+			toSwitchScenes = false;
+		if (GetAsyncKeyState('2'))
+			toSwitchScenes = true;
+
+		if (!toSwitchScenes)
+		{
+#pragma region LightsAndTime
+			static float rotate = 0; rotate += 0.0025f;
+			static float timep = 0; timep += 0.0025f;
+			XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
+			XMStoreFloat4(&myCBuff.timer, time);
+			if (myCBuff.pointLightRadius.x > 15.0f)
+				toReduceRadius = true;
+			else if (myCBuff.pointLightRadius.x < 3.0f)
+				toReduceRadius = false;
+			if (toReduceRadius)
+			{
+				myCBuff.pointLightRadius.x -= 0.01f;
+				myCBuff.pointLightPos.z -= 0.01f;
+				myCBuff.spotLightPos.z -= 0.025f;
+				myCBuff.spotLightDir.z += 0.001f;
+			}
+			else if (!toReduceRadius)
+			{
+				myCBuff.pointLightRadius.x += 0.01f;
+				myCBuff.pointLightPos.z += 0.01f;
+				myCBuff.spotLightPos.z += 0.025f;
+				myCBuff.spotLightDir.z -= 0.001f;
+			}
+#pragma endregion
+
 #pragma region SetupForRenderingSkybox
-		ID3D11ShaderResourceView* SkyboxViews[] = { skyboxtextureRV };
-		myCon->PSSetShaderResources(0, 1, SkyboxViews);
+			ID3D11ShaderResourceView* SkyboxViews[] = { skyboxtextureRV };
+			myCon->PSSetShaderResources(0, 1, SkyboxViews);
 
-		myCon->IASetInputLayout(skyboxMeshLayout);
-		UINT skybox_strides[] = { sizeof(SimpleMesh) };
-		UINT skybox_offsets[] = { 0 };
-		ID3D11Buffer* skyboxVB[] = { skyboxvBuff };
-		myCon->IASetVertexBuffers(0, 1, skyboxVB, skybox_strides, skybox_offsets);
-		myCon->IASetIndexBuffer(skyboxiBuff, DXGI_FORMAT_R32_UINT, 0);
-		myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			myCon->IASetInputLayout(skyboxMeshLayout);
+			UINT skybox_strides[] = { sizeof(SimpleMesh) };
+			UINT skybox_offsets[] = { 0 };
+			ID3D11Buffer* skyboxVB[] = { skyboxvBuff };
+			myCon->IASetVertexBuffers(0, 1, skyboxVB, skybox_strides, skybox_offsets);
+			myCon->IASetIndexBuffer(skyboxiBuff, DXGI_FORMAT_R32_UINT, 0);
+			myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		myCon->VSSetShader(skyboxvShader, 0, 0);
-		myCon->PSSetShader(skyboxpShader, 0, 0);
+			myCon->VSSetShader(skyboxvShader, 0, 0);
+			myCon->PSSetShader(skyboxpShader, 0, 0);
 
-		XMMATRIX worldMatrix = XMMatrixTranslationFromVector(XMMatrixInverse(0, camera).r[3]);
-		//worldMatrix = XMMatrixTranslation(0, 10, 0);
-		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+			XMMATRIX worldMatrix = XMMatrixTranslationFromVector(XMMatrixInverse(0, camera).r[3]);
+			//worldMatrix = XMMatrixTranslation(0, 10, 0);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
-		// send it ot the CARD
-		D3D11_MAPPED_SUBRESOURCE gpuBuffer;
-		HRESULT	hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
-		myCon->Unmap(cBuff, 0);
+			// send it ot the CARD
+			D3D11_MAPPED_SUBRESOURCE gpuBuffer;
+			HRESULT	hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
 
-		ID3D11Buffer* constants[] = { cBuff };
-		myCon->VSSetConstantBuffers(0, 1, constants);
-		myCon->PSSetConstantBuffers(0, 1, constants);
+			ID3D11Buffer* constants[] = { cBuff };
+			myCon->VSSetConstantBuffers(0, 1, constants);
+			myCon->PSSetConstantBuffers(0, 1, constants);
 
-		// draw it
-		myCon->DrawIndexed(skyboxMesh.indicesList.size(), 0, 0);
+			// draw it
+			myCon->DrawIndexed(skyboxMesh.indicesList.size(), 0, 0);
 
-		myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
+			myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
 #pragma endregion
 
 #pragma region SetupForRenderingProceduralMesh
-		// Input Assembler
-		myCon->IASetInputLayout(vLayout);
-		UINT strides[] = { sizeof(BaseMesh) };
-		UINT offsets[] = { 0 };
-		ID3D11Buffer* tempVB[] = { vBuff };
-		myCon->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
-		myCon->IASetIndexBuffer(iBuff, DXGI_FORMAT_R32_UINT, 0);
-		myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			// Input Assembler
+			myCon->IASetInputLayout(vLayout);
+			UINT strides[] = { sizeof(BaseMesh) };
+			UINT offsets[] = { 0 };
+			ID3D11Buffer* tempVB[] = { vBuff };
+			myCon->IASetVertexBuffers(0, 1, tempVB, strides, offsets);
+			myCon->IASetIndexBuffer(iBuff, DXGI_FORMAT_R32_UINT, 0);
+			myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		// Vertex Shader Stage
-		myCon->VSSetShader(vShader, 0, 0);
-		// Pixel Shader Stage
-		myCon->PSSetShader(pShader, 0, 0);
+			// Vertex Shader Stage
+			myCon->VSSetShader(vShader, 0, 0);
+			// Pixel Shader Stage
+			myCon->PSSetShader(pShader, 0, 0);
 
-		// make a world matrix for each object
-		worldMatrix = XMMatrixIdentity();
-		worldMatrix = XMMatrixTranslation(0, 5, 20);
-		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+			// make a world matrix for each object
+			worldMatrix = XMMatrixIdentity();
+			worldMatrix = XMMatrixTranslation(0, 5, 20);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
-		// Upload those matrices to the video card
-		// Create and update a constant buffer (move variable from C++ to shaders)
-		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
-		//memcpy(gpuBuffer.pData, &MyMatrices, sizeof(WVP));
-		myCon->Unmap(cBuff, 0);
+			// Upload those matrices to the video card
+			// Create and update a constant buffer (move variable from C++ to shaders)
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			//memcpy(gpuBuffer.pData, &MyMatrices, sizeof(WVP));
+			myCon->Unmap(cBuff, 0);
 #pragma endregion
 
-		// Apply matrix math in Vertex Shader _ check
-		// connect constant buffer to pipeline _ check
-		// remember by default HLSL matrices are COLUMN MAJOR
+			// Apply matrix math in Vertex Shader _ check
+			// connect constant buffer to pipeline _ check
+			// remember by default HLSL matrices are COLUMN MAJOR
 
-		// Draw?
-		myCon->DrawIndexed(procedure.indexList.size(), 0, 0);
+			// Draw?
+			myCon->DrawIndexed(procedure.indexList.size(), 0, 0);
 
 
-		// immediate context
-		ID3D11ShaderResourceView* texViews[] = { textureRV };
-		myCon->PSSetShaderResources(0, 1, texViews);
-		// get a more complex pre-made mesh (FBX, OBJ, custom header) _ check
-		// load it onto the card (vertex buffer, index buffer) _ check
-		// make sure our shaders can process it _ check?
-		// place it somewhere else in the environment ???
+			// immediate context
+			ID3D11ShaderResourceView* texViews[] = { textureRV };
+			myCon->PSSetShaderResources(0, 1, texViews);
+			// get a more complex pre-made mesh (FBX, OBJ, custom header) _ check
+			// load it onto the card (vertex buffer, index buffer) _ check
+			// make sure our shaders can process it _ check?
+			// place it somewhere else in the environment ???
 
 #pragma region SetupForRenderingStoneHengeMesh
 		// set pipeline
-		myCon->IASetInputLayout(vMeshLayout);
-		UINT mesh_strides[] = { sizeof(_OBJ_VERT_) };
-		UINT mesh_offsets[] = { 0 };
-		ID3D11Buffer* meshVB[] = { vBuffMesh };
-		myCon->IASetVertexBuffers(0, 1, meshVB, mesh_strides, mesh_offsets);
-		myCon->IASetIndexBuffer(iBuffMesh, DXGI_FORMAT_R32_UINT, 0);
+			myCon->IASetInputLayout(vMeshLayout);
+			UINT mesh_strides[] = { sizeof(_OBJ_VERT_) };
+			UINT mesh_offsets[] = { 0 };
+			ID3D11Buffer* meshVB[] = { vBuffMesh };
+			myCon->IASetVertexBuffers(0, 1, meshVB, mesh_strides, mesh_offsets);
+			myCon->IASetIndexBuffer(iBuffMesh, DXGI_FORMAT_R32_UINT, 0);
 
-		myCon->VSSetShader(vMeshShader, 0, 0);
-		myCon->PSSetShader(pMeshShader, 0, 0);
+			myCon->VSSetShader(vMeshShader, 0, 0);
+			myCon->PSSetShader(pMeshShader, 0, 0);
 
-		// modify world matrix before drawing next thing
-		worldMatrix = XMMatrixIdentity();
-		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+			// modify world matrix before drawing next thing
+			worldMatrix = XMMatrixIdentity();
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
-		// send it ot the CARD
-		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
-		myCon->Unmap(cBuff, 0);
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
 
-		// draw it
-		myCon->DrawIndexed(2532, 0, 0);
+			// draw it
+			myCon->DrawIndexed(2532, 0, 0);
 #pragma endregion
 
 #pragma region SetupForRenderingCrystal
-		ID3D11ShaderResourceView* crystalViews[] = { crystaltextureRV };
-		myCon->PSSetShaderResources(0, 1, crystalViews);
+			ID3D11ShaderResourceView* crystalViews[] = { crystaltextureRV };
+			myCon->PSSetShaderResources(0, 1, crystalViews);
 
-		myCon->IASetInputLayout(crystalMeshLayout);
-		UINT crystal_strides[] = { sizeof(SimpleMesh) };
-		UINT crystal_offsets[] = { 0 };
-		ID3D11Buffer* crystalVB[] = { crystalvBuff };
-		myCon->IASetVertexBuffers(0, 1, crystalVB, crystal_strides, crystal_offsets);
-		myCon->IASetIndexBuffer(crystaliBuff, DXGI_FORMAT_R32_UINT, 0);
+			myCon->IASetInputLayout(crystalMeshLayout);
+			UINT crystal_strides[] = { sizeof(SimpleMesh) };
+			UINT crystal_offsets[] = { 0 };
+			ID3D11Buffer* crystalVB[] = { crystalvBuff };
+			myCon->IASetVertexBuffers(0, 1, crystalVB, crystal_strides, crystal_offsets);
+			myCon->IASetIndexBuffer(crystaliBuff, DXGI_FORMAT_R32_UINT, 0);
 
-		myCon->VSSetShader(crystalvShader, 0, 0);
-		myCon->PSSetShader(crystalpShader, 0, 0);
+			myCon->VSSetShader(crystalvShader, 0, 0);
+			myCon->PSSetShader(crystalpShader, 0, 0);
 
-		worldMatrix = XMMatrixTranslation(-15.0f, 3.0f, 4.0f);
-		XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+			worldMatrix = XMMatrixTranslation(-15.0f, 3.0f, 4.0f);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
-		// send it ot the CARD
-		hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
-		*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
-		myCon->Unmap(cBuff, 0);
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
 
-		// draw it
-		myCon->DrawIndexedInstanced(crystalMesh.indicesList.size(), 5, 0, 0, 0);
+			// draw it
+			myCon->DrawIndexedInstanced(crystalMesh.indicesList.size(), 5, 0, 0, 0);
 #pragma endregion
+		}
+
+		if (toSwitchScenes)
+		{
+#pragma region LightsAndTime
+			static float rotate = 0; rotate += 0.0025f;
+			static float timep = 0; timep += 0.0025f;
+			XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
+			XMStoreFloat4(&myCBuff.timer, time);
+			if (myCBuff.pointLightRadius.x > 15.0f)
+				toReduceRadius = true;
+			else if (myCBuff.pointLightRadius.x < 3.0f)
+				toReduceRadius = false;
+			if (toReduceRadius)
+			{
+				myCBuff.pointLightRadius.x -= 0.01f;
+				myCBuff.pointLightPos.z -= 0.01f;
+				myCBuff.spotLightPos.z -= 0.025f;
+				myCBuff.spotLightDir.z += 0.001f;
+			}
+			else if (!toReduceRadius)
+			{
+				myCBuff.pointLightRadius.x += 0.01f;
+				myCBuff.pointLightPos.z += 0.01f;
+				myCBuff.spotLightPos.z += 0.025f;
+				myCBuff.spotLightDir.z -= 0.001f;
+			}
+#pragma endregion
+
+#pragma region SetupForRenderingSkybox2
+			ID3D11ShaderResourceView* Skybox2Views[] = { skybox2textureRV };
+			myCon->PSSetShaderResources(0, 1, Skybox2Views);
+
+			myCon->IASetInputLayout(skybox2MeshLayout);
+			UINT skybox2_strides[] = { sizeof(SimpleMesh) };
+			UINT skybox2_offsets[] = { 0 };
+			ID3D11Buffer* skybox2VB[] = { skybox2vBuff };
+			myCon->IASetVertexBuffers(0, 1, skybox2VB, skybox2_strides, skybox2_offsets);
+			myCon->IASetIndexBuffer(skybox2iBuff, DXGI_FORMAT_R32_UINT, 0);
+			myCon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			myCon->VSSetShader(skybox2vShader, 0, 0);
+			myCon->PSSetShader(skybox2pShader, 0, 0);
+
+			XMMATRIX worldMatrix = XMMatrixTranslationFromVector(XMMatrixInverse(0, camera).r[3]);
+			//worldMatrix = XMMatrixTranslation(0, 10, 0);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+			// send it ot the CARD
+			D3D11_MAPPED_SUBRESOURCE gpuBuffer;
+			HRESULT	hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
+
+			ID3D11Buffer* constants[] = { cBuff };
+			myCon->VSSetConstantBuffers(0, 1, constants);
+			myCon->PSSetConstantBuffers(0, 1, constants);
+
+			// draw it
+			myCon->DrawIndexed(skybox2Mesh.indicesList.size(), 0, 0);
+
+			myCon->ClearDepthStencilView(zBufferView, D3D11_CLEAR_DEPTH, 1, 0);
+#pragma endregion
+
+#pragma region SetupForRenderingSpaceShip
+			ID3D11ShaderResourceView* spaceShipViews[] = { spaceShiptextureRV };
+			myCon->PSSetShaderResources(0, 1, spaceShipViews);
+
+			myCon->IASetInputLayout(spaceShipMeshLayout);
+			UINT spaceShip_strides[] = { sizeof(SimpleMesh) };
+			UINT spaceShip_offsets[] = { 0 };
+			ID3D11Buffer* spaceShipVB[] = { spaceShipvBuff };
+			myCon->IASetVertexBuffers(0, 1, spaceShipVB, spaceShip_strides, spaceShip_offsets);
+			myCon->IASetIndexBuffer(spaceShipiBuff, DXGI_FORMAT_R32_UINT, 0);
+
+			myCon->VSSetShader(spaceShipvShader, 0, 0);
+			myCon->PSSetShader(spaceShippShader, 0, 0);
+
+			worldMatrix = XMMatrixTranslation(-30.0f, 0.0f, 0.0f);
+			XMMATRIX tempRot = XMMatrixRotationY(rotate);
+			worldMatrix = XMMatrixMultiply(worldMatrix, tempRot);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
+
+			// draw it
+			myCon->DrawIndexed(spaceShipMesh.indicesList.size(), 0, 0);
+#pragma endregion
+		}
 
 		mySwap->Present(0, 0);
 	}
@@ -713,7 +837,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		{{ 1.0f,  1.0f, -1.0f } },
 		{{-1.0f,  1.0f, -1.0f } },
 		{{-1.0f, -1.0f, -1.0f } }
-		
+
 	};
 
 	skyboxMesh.indicesList = {
@@ -769,6 +893,137 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	dssDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 
 	myDev->CreateDepthStencilState(&dssDesc, &skyState);
+#pragma endregion
+
+#pragma region SkyBox2
+	skybox2Mesh.verticesList = {
+		{{ 1.0f, -1.0f,  1.0f } },
+		{{ 1.0f,  1.0f,  1.0f } },
+		{{ 1.0f,  1.0f, -1.0f } },
+
+		{{ 1.0f, -1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } },
+		{{-1.0f,  1.0f, -1.0f } },
+
+		{{-1.0f,  1.0f,  1.0f } },
+		{{-1.0f, -1.0f,  1.0f } },
+		{{-1.0f, -1.0f,  1.0f } },
+
+		{{ 1.0f, -1.0f,  1.0f } },
+		{{ 1.0f, -1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } },
+
+		{{ 1.0f,  1.0f, -1.0f } },
+		{{ 1.0f,  1.0f,  1.0f } },
+		{{-1.0f,  1.0f,  1.0f } },
+
+		{{-1.0f,  1.0f, -1.0f } },
+		{{-1.0f,  1.0f,  1.0f } },
+		{{ 1.0f,  1.0f,  1.0f } },
+
+		{{ 1.0f, -1.0f,  1.0f } },
+		{{-1.0f, -1.0f,  1.0f } },
+		{{ 1.0f, -1.0f, -1.0f } },
+
+		{{ 1.0f,  1.0f, -1.0f } },
+		{{-1.0f,  1.0f, -1.0f } },
+		{{-1.0f, -1.0f, -1.0f } }
+
+	};
+
+	skybox2Mesh.indicesList = {
+		0,  1,  2,
+		0,  2,  3,
+		4,  5,  6,
+		4,  6,  7,
+		8,  9, 10,
+		8, 10, 11,
+		12, 13, 14,
+		12, 14, 15,
+		16, 17, 18,
+		16, 18, 19,
+		20, 21, 22,
+		20, 22, 23
+	};
+
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (skybox2Mesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = skybox2Mesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &skybox2vBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (skybox2Mesh.indicesList.size());
+	subData.pSysMem = skybox2Mesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &skybox2iBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MySkyboxVShader, sizeof(MySkyboxVShader), nullptr, &skybox2vShader);
+	hr = myDev->CreatePixelShader(MySkyboxPShader, sizeof(MySkyboxPShader), nullptr, &skybox2pShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC skybox2InputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(skybox2InputDesc, 3, MySkyboxVShader, sizeof(MySkyboxVShader), &skybox2MeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/SpaceSkybox.dds", (ID3D11Resource**)&skybox2Texture, &skybox2textureRV);
+
+	D3D11_DEPTH_STENCIL_DESC dss2Desc;
+	ZeroMemory(&dss2Desc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+	dss2Desc.DepthEnable = true;
+	dss2Desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	dss2Desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+
+	myDev->CreateDepthStencilState(&dss2Desc, &sky2State);
+#pragma endregion
+
+#pragma region SpaceShipMesh
+	LoadMesh("Assets/spaceship.mesh", spaceShipMesh);
+	for (int i = 0; i < spaceShipMesh.verticesList.size(); ++i)
+	{
+		spaceShipMesh.verticesList[i].Pos.x *= 5;
+		spaceShipMesh.verticesList[i].Pos.y *= 5;
+		spaceShipMesh.verticesList[i].Pos.z *= 5;
+	}
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (spaceShipMesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = spaceShipMesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &spaceShipvBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (spaceShipMesh.indicesList.size());
+	subData.pSysMem = spaceShipMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &spaceShipiBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &spaceShipvShader);
+	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &spaceShippShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC SpaceShipInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(SpaceShipInputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &spaceShipMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/AlienSpeed_D.dds", (ID3D11Resource**)&spaceShipTexture, &spaceShiptextureRV);
 #pragma endregion
 
 #pragma region DepthBuffer(ZBuffer)
