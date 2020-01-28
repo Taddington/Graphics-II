@@ -48,6 +48,7 @@ OutputVertex main(InputVertex input, uint instanceID : SV_InstanceID)
 	// Do math here (shader intrinsics)
 
 	output.xyzw = mul(worldMatrix, output.xyzw);
+	output.nrms = mul(worldMatrix, output.nrms);
 	output.worldpos = output.xyzw;
 	output.xyzw = mul(viewMatrix, output.xyzw);
 	output.xyzw = mul(projectionMatrix, output.xyzw);

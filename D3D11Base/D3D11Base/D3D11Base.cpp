@@ -24,6 +24,8 @@ using namespace DirectX;
 #include "MySkyboxVShader.csh"
 #include "MySkyboxPShader.csh"
 
+#include "MySunPShader.csh"
+
 // pre-made mesh
 #include "Assets/StoneHenge.h"
 #include <Windows.h>
@@ -59,6 +61,10 @@ SimpleMesh crystalMesh;
 SimpleMesh skyboxMesh;
 SimpleMesh skybox2Mesh;
 SimpleMesh spaceShipMesh;
+SimpleMesh sunMesh;
+SimpleMesh earthMesh;
+SimpleMesh jupiterMesh;
+SimpleMesh moonMesh;
 
 struct MyVertex
 {
@@ -118,6 +124,46 @@ CComPtr<ID3D11VertexShader> spaceShipvShader;
 CComPtr<ID3D11PixelShader> spaceShippShader;
 #pragma endregion
 
+#pragma region SunMesh
+CComPtr<ID3D11InputLayout> sunMeshLayout;
+CComPtr<ID3D11Buffer> sunvBuff;
+CComPtr<ID3D11Buffer> suniBuff;
+CComPtr<ID3D11Texture2D> sunTexture;
+CComPtr<ID3D11ShaderResourceView> suntextureRV;
+CComPtr<ID3D11VertexShader> sunvShader;
+CComPtr<ID3D11PixelShader> sunpShader;
+#pragma endregion
+
+#pragma region EarthMesh
+CComPtr<ID3D11InputLayout> earthMeshLayout;
+CComPtr<ID3D11Buffer> earthvBuff;
+CComPtr<ID3D11Buffer> earthiBuff;
+CComPtr<ID3D11Texture2D> earthTexture;
+CComPtr<ID3D11ShaderResourceView> earthtextureRV;
+CComPtr<ID3D11VertexShader> earthvShader;
+CComPtr<ID3D11PixelShader> earthpShader;
+#pragma endregion
+
+#pragma region JupiterMesh
+CComPtr<ID3D11InputLayout> jupiterMeshLayout;
+CComPtr<ID3D11Buffer> jupitervBuff;
+CComPtr<ID3D11Buffer> jupiteriBuff;
+CComPtr<ID3D11Texture2D> jupiterTexture;
+CComPtr<ID3D11ShaderResourceView> jupitertextureRV;
+CComPtr<ID3D11VertexShader> jupitervShader;
+CComPtr<ID3D11PixelShader> jupiterpShader;
+#pragma endregion
+
+#pragma region MoonMesh
+CComPtr<ID3D11InputLayout> moonMeshLayout;
+CComPtr<ID3D11Buffer> moonvBuff;
+CComPtr<ID3D11Buffer> mooniBuff;
+CComPtr<ID3D11Texture2D> moonTexture;
+CComPtr<ID3D11ShaderResourceView> moontextureRV;
+CComPtr<ID3D11VertexShader> moonvShader;
+CComPtr<ID3D11PixelShader> moonpShader;
+#pragma endregion
+
 #pragma region Skybox
 CComPtr<ID3D11InputLayout> skyboxMeshLayout;
 CComPtr<ID3D11Buffer> skyboxvBuff;
@@ -167,7 +213,7 @@ ConstantBuffer myCBuff;
 XMMATRIX view;
 bool toReduceRadius = false;
 float nearPlane = 0.1f;
-float farPlane = 75.0f;
+float farPlane = 200.0f;
 float FOV = 2.0f;
 
 bool toSwitchScenes = false;
@@ -314,27 +360,39 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		if (!toSwitchScenes)
 		{
 #pragma region LightsAndTime
+			myCBuff.directionalLightPos = XMFLOAT4(-0.577f, -0.577f, 0.577f, 1.0f);
+			myCBuff.directionalLightColor = XMFLOAT4(0.75f, 0.75f, 0.94f, 1.0f);
+			static float pointRadius = 9.0f;
+			static float pointPosZ = 0.0f;
+			static float spotPosZ = 0.0f;
+			static float spotDirZ = 0.0f;
+			myCBuff.pointLightPos = XMFLOAT4(-8.0f, 2.0f, pointPosZ, 0.0f);
+			myCBuff.pointLightColor = XMFLOAT4(2.0f, 2.0f, 0.0f, 1.0f);
+			myCBuff.pointLightRadius = XMFLOAT4(pointRadius, 0.0f, 0.0f, 0.0f);
+			myCBuff.spotLightPos = XMFLOAT4(8.0f, 2.0f, spotPosZ, 0.0f);
+			myCBuff.spotLightColor = XMFLOAT4(1.5f, 1.5f, 1.5f, 1.0f);
+			myCBuff.spotLightDir = XMFLOAT4(0.0f, -0.5f, spotDirZ, 1.0f);
 			static float rotate = 0; rotate += 0.0025f;
 			static float timep = 0; timep += 0.0025f;
 			XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
 			XMStoreFloat4(&myCBuff.timer, time);
-			if (myCBuff.pointLightRadius.x > 15.0f)
+			if (pointRadius > 15.0f)
 				toReduceRadius = true;
-			else if (myCBuff.pointLightRadius.x < 3.0f)
+			else if (pointRadius < 3.0f)
 				toReduceRadius = false;
 			if (toReduceRadius)
 			{
-				myCBuff.pointLightRadius.x -= 0.01f;
-				myCBuff.pointLightPos.z -= 0.01f;
-				myCBuff.spotLightPos.z -= 0.025f;
-				myCBuff.spotLightDir.z += 0.001f;
+				pointRadius -= 0.01f;
+				pointPosZ -= 0.01f;
+				spotPosZ -= 0.025f;
+				spotDirZ += 0.001f;
 			}
 			else if (!toReduceRadius)
 			{
-				myCBuff.pointLightRadius.x += 0.01f;
-				myCBuff.pointLightPos.z += 0.01f;
-				myCBuff.spotLightPos.z += 0.025f;
-				myCBuff.spotLightDir.z -= 0.001f;
+				pointRadius += 0.01f;
+				pointPosZ += 0.01f;
+				spotPosZ += 0.025f;
+				spotDirZ -= 0.001f;
 			}
 #pragma endregion
 
@@ -472,7 +530,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		if (toSwitchScenes)
 		{
 #pragma region LightsAndTime
-			static float rotate = 0; rotate += 0.0025f;
+			myCBuff.directionalLightPos = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			myCBuff.directionalLightColor = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			myCBuff.pointLightPos = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			myCBuff.pointLightColor = XMFLOAT4(2.0f, 2.0f, 2.0f, 1.0f);
+			myCBuff.pointLightRadius = XMFLOAT4(1000.0f, 0.0f, 0.0f, 0.0f);
+			myCBuff.spotLightPos = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			myCBuff.spotLightColor = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			myCBuff.spotLightDir = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
 			static float timep = 0; timep += 0.0025f;
 			XMVECTOR time = XMVectorSet(timep, 0.0f, 0.0f, 0.0f);
 			XMStoreFloat4(&myCBuff.timer, time);
@@ -480,20 +545,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 				toReduceRadius = true;
 			else if (myCBuff.pointLightRadius.x < 3.0f)
 				toReduceRadius = false;
-			if (toReduceRadius)
-			{
-				myCBuff.pointLightRadius.x -= 0.01f;
-				myCBuff.pointLightPos.z -= 0.01f;
-				myCBuff.spotLightPos.z -= 0.025f;
-				myCBuff.spotLightDir.z += 0.001f;
-			}
-			else if (!toReduceRadius)
-			{
-				myCBuff.pointLightRadius.x += 0.01f;
-				myCBuff.pointLightPos.z += 0.01f;
-				myCBuff.spotLightPos.z += 0.025f;
-				myCBuff.spotLightDir.z -= 0.001f;
-			}
 #pragma endregion
 
 #pragma region SetupForRenderingSkybox2
@@ -532,6 +583,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 #pragma endregion
 
 #pragma region SetupForRenderingSpaceShip
+			static float shipRotate = 0; shipRotate -= 0.005f;
 			ID3D11ShaderResourceView* spaceShipViews[] = { spaceShiptextureRV };
 			myCon->PSSetShaderResources(0, 1, spaceShipViews);
 
@@ -545,8 +597,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			myCon->VSSetShader(spaceShipvShader, 0, 0);
 			myCon->PSSetShader(spaceShippShader, 0, 0);
 
-			worldMatrix = XMMatrixTranslation(-30.0f, 0.0f, 0.0f);
-			XMMATRIX tempRot = XMMatrixRotationY(rotate);
+			worldMatrix = XMMatrixTranslation(70.0f, 0.0f, 0.0f);
+			XMMATRIX tempRot = XMMatrixRotationY(shipRotate);
 			worldMatrix = XMMatrixMultiply(worldMatrix, tempRot);
 			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
 
@@ -557,6 +609,139 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 			// draw it
 			myCon->DrawIndexed(spaceShipMesh.indicesList.size(), 0, 0);
+#pragma endregion
+
+#pragma region SetupForRenderingSun
+			static float sunRotate = 0; sunRotate += 0.003f;
+			ID3D11ShaderResourceView* sunViews[] = { suntextureRV };
+			myCon->PSSetShaderResources(0, 1, sunViews);
+
+			myCon->IASetInputLayout(sunMeshLayout);
+			UINT sun_strides[] = { sizeof(SimpleMesh) };
+			UINT sun_offsets[] = { 0 };
+			ID3D11Buffer* sunVB[] = { sunvBuff };
+			myCon->IASetVertexBuffers(0, 1, sunVB, sun_strides, sun_offsets);
+			myCon->IASetIndexBuffer(suniBuff, DXGI_FORMAT_R32_UINT, 0);
+
+			myCon->VSSetShader(sunvShader, 0, 0);
+			myCon->PSSetShader(sunpShader, 0, 0);
+
+			worldMatrix = XMMatrixIdentity();
+			tempRot = XMMatrixRotationY(sunRotate);
+			worldMatrix = XMMatrixMultiply(tempRot, worldMatrix);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
+
+			// draw it
+			myCon->DrawIndexed(sunMesh.indicesList.size(), 0, 0);
+#pragma endregion
+
+#pragma region SetupForRenderingEarth
+			static float earthOrbitRotate = 0; earthOrbitRotate += 0.001f;
+			static float earthAxisRotate = 0; earthAxisRotate += 0.005f;
+			ID3D11ShaderResourceView* earthViews[] = { earthtextureRV };
+			myCon->PSSetShaderResources(0, 1, earthViews);
+
+			myCon->IASetInputLayout(earthMeshLayout);
+			UINT earth_strides[] = { sizeof(SimpleMesh) };
+			UINT earth_offsets[] = { 0 };
+			ID3D11Buffer* earthVB[] = { earthvBuff };
+			myCon->IASetVertexBuffers(0, 1, earthVB, earth_strides, earth_offsets);
+			myCon->IASetIndexBuffer(earthiBuff, DXGI_FORMAT_R32_UINT, 0);
+
+			myCon->VSSetShader(earthvShader, 0, 0);
+			myCon->PSSetShader(earthpShader, 0, 0);
+
+			worldMatrix = XMMatrixTranslation(-120.0f, 0.0f, 0.0f);
+			tempRot = XMMatrixRotationY(earthOrbitRotate);
+			worldMatrix = XMMatrixMultiply(worldMatrix, tempRot);
+			tempRot = XMMatrixRotationY(earthAxisRotate);
+			worldMatrix = XMMatrixMultiply(tempRot, worldMatrix);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
+
+			// draw it
+			myCon->DrawIndexed(earthMesh.indicesList.size(), 0, 0);
+#pragma endregion
+
+#pragma region SetupForRenderingJupiter
+			static float jupiterOrbitRotate = 0; jupiterOrbitRotate += 0.0005f;
+			static float jupiterAxisRotate = 0; jupiterAxisRotate += 0.0025f;
+			ID3D11ShaderResourceView* jupiterViews[] = { jupitertextureRV };
+			myCon->PSSetShaderResources(0, 1, jupiterViews);
+
+			myCon->IASetInputLayout(jupiterMeshLayout);
+			UINT jupiter_strides[] = { sizeof(SimpleMesh) };
+			UINT jupiter_offsets[] = { 0 };
+			ID3D11Buffer* jupiterVB[] = { jupitervBuff };
+			myCon->IASetVertexBuffers(0, 1, jupiterVB, jupiter_strides, jupiter_offsets);
+			myCon->IASetIndexBuffer(jupiteriBuff, DXGI_FORMAT_R32_UINT, 0);
+
+			myCon->VSSetShader(jupitervShader, 0, 0);
+			myCon->PSSetShader(jupiterpShader, 0, 0);
+
+			worldMatrix = XMMatrixTranslation(200.0f, 0.0f, 0.0f);
+			tempRot = XMMatrixRotationY(jupiterOrbitRotate);
+			worldMatrix = XMMatrixMultiply(worldMatrix, tempRot);
+			tempRot = XMMatrixRotationY(jupiterAxisRotate);
+			worldMatrix = XMMatrixMultiply(tempRot, worldMatrix);
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
+
+			// draw it
+			myCon->DrawIndexed(jupiterMesh.indicesList.size(), 0, 0);
+#pragma endregion
+
+#pragma region SetupForRenderingMoon
+			static float moonOrbitRotate = 0; moonOrbitRotate += 0.001f;
+			static float moonAxisRotate = 0; moonAxisRotate += 0.005f;
+			static float moonOrbit2Rotate = 0; moonOrbit2Rotate -= 0.01f;
+			ID3D11ShaderResourceView* moonViews[] = { moontextureRV };
+			myCon->PSSetShaderResources(0, 1, moonViews);
+
+			myCon->IASetInputLayout(moonMeshLayout);
+			UINT moon_strides[] = { sizeof(SimpleMesh) };
+			UINT moon_offsets[] = { 0 };
+			ID3D11Buffer* moonVB[] = { moonvBuff };
+			myCon->IASetVertexBuffers(0, 1, moonVB, moon_strides, moon_offsets);
+			myCon->IASetIndexBuffer(mooniBuff, DXGI_FORMAT_R32_UINT, 0);
+
+			myCon->VSSetShader(moonvShader, 0, 0);
+			myCon->PSSetShader(moonpShader, 0, 0);
+
+			worldMatrix = XMMatrixTranslation(-120.0f, 0.0f, 0.0f);
+			tempRot = XMMatrixRotationY(moonOrbitRotate);
+			worldMatrix = XMMatrixMultiply(worldMatrix, tempRot);
+
+			tempRot = XMMatrixRotationY(moonAxisRotate);
+			worldMatrix = XMMatrixMultiply(tempRot, worldMatrix);
+
+			XMMATRIX tempMat = XMMatrixTranslation(-30.0f, 0.0f, 0.0f);
+			tempRot = XMMatrixRotationY(moonOrbit2Rotate);
+			tempMat = XMMatrixMultiply(tempMat, tempRot);
+			worldMatrix = XMMatrixMultiply(tempMat, worldMatrix);
+
+			XMStoreFloat4x4(&myCBuff.wMatrix, worldMatrix);
+
+			// send it ot the CARD
+			hr = myCon->Map(cBuff, 0, D3D11_MAP_WRITE_DISCARD, 0, &gpuBuffer);
+			*((ConstantBuffer*)(gpuBuffer.pData)) = myCBuff;
+			myCon->Unmap(cBuff, 0);
+
+			// draw it
+			myCon->DrawIndexed(moonMesh.indicesList.size(), 0, 0);
 #pragma endregion
 		}
 
@@ -721,7 +906,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 #pragma region ConstantBuffer
 	// create constant buffer
-	view = XMMatrixTranslation(0, 5, -10);
+	view = XMMatrixTranslation(0, 10, -60);
 
 	ZeroMemory(&bDesc, sizeof(bDesc));
 
@@ -990,9 +1175,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	LoadMesh("Assets/spaceship.mesh", spaceShipMesh);
 	for (int i = 0; i < spaceShipMesh.verticesList.size(); ++i)
 	{
-		spaceShipMesh.verticesList[i].Pos.x *= 5;
-		spaceShipMesh.verticesList[i].Pos.y *= 5;
-		spaceShipMesh.verticesList[i].Pos.z *= 5;
+		spaceShipMesh.verticesList[i].Pos.x *= 3;
+		spaceShipMesh.verticesList[i].Pos.y *= 3;
+		spaceShipMesh.verticesList[i].Pos.z *= 3;
 	}
 	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	bDesc.ByteWidth = sizeof(SimpleMesh) * (spaceShipMesh.verticesList.size());
@@ -1024,6 +1209,166 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hr = myDev->CreateInputLayout(SpaceShipInputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &spaceShipMeshLayout);
 
 	hr = CreateDDSTextureFromFile(myDev, L"Assets/AlienSpeed_D.dds", (ID3D11Resource**)&spaceShipTexture, &spaceShiptextureRV);
+#pragma endregion
+
+#pragma region SunMesh
+	LoadMesh("Assets/planet.mesh", sunMesh);
+	for (int i = 0; i < sunMesh.verticesList.size(); ++i)
+	{
+		sunMesh.verticesList[i].Pos.x *= 50;
+		sunMesh.verticesList[i].Pos.y *= 50;
+		sunMesh.verticesList[i].Pos.z *= 50;
+	}
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (sunMesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = sunMesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &sunvBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (sunMesh.indicesList.size());
+	subData.pSysMem = sunMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &suniBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &sunvShader);
+	hr = myDev->CreatePixelShader(MySunPShader, sizeof(MySunPShader), nullptr, &sunpShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC SunInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(SunInputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &sunMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/SunTexture.dds", (ID3D11Resource**)&sunTexture, &suntextureRV);
+#pragma endregion
+
+#pragma region EarthMesh
+	LoadMesh("Assets/planet.mesh", earthMesh);
+	for (int i = 0; i < earthMesh.verticesList.size(); ++i)
+	{
+		earthMesh.verticesList[i].Pos.x *= 15;
+		earthMesh.verticesList[i].Pos.y *= 15;
+		earthMesh.verticesList[i].Pos.z *= 15;
+	}
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (earthMesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = earthMesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &earthvBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (earthMesh.indicesList.size());
+	subData.pSysMem = earthMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &earthiBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &earthvShader);
+	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &earthpShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC EarthInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(EarthInputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &earthMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/EarthTexture.dds", (ID3D11Resource**)&earthTexture, &earthtextureRV);
+#pragma endregion
+
+#pragma region JupiterMesh
+	LoadMesh("Assets/planet.mesh", jupiterMesh);
+	for (int i = 0; i < jupiterMesh.verticesList.size(); ++i)
+	{
+		jupiterMesh.verticesList[i].Pos.x *= 25;
+		jupiterMesh.verticesList[i].Pos.y *= 25;
+		jupiterMesh.verticesList[i].Pos.z *= 25;
+	}
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (jupiterMesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = jupiterMesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &jupitervBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (jupiterMesh.indicesList.size());
+	subData.pSysMem = jupiterMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &jupiteriBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &jupitervShader);
+	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &jupiterpShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC JupiterInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(JupiterInputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &jupiterMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/JupiterTexture.dds", (ID3D11Resource**)&jupiterTexture, &jupitertextureRV);
+#pragma endregion
+
+#pragma region MoonMesh
+	LoadMesh("Assets/planet.mesh", moonMesh);
+	for (int i = 0; i < moonMesh.verticesList.size(); ++i)
+	{
+		moonMesh.verticesList[i].Pos.x *= 5;
+		moonMesh.verticesList[i].Pos.y *= 5;
+		moonMesh.verticesList[i].Pos.z *= 5;
+	}
+	bDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bDesc.ByteWidth = sizeof(SimpleMesh) * (moonMesh.verticesList.size());
+	bDesc.CPUAccessFlags = 0;
+	bDesc.MiscFlags = 0;
+	bDesc.StructureByteStride = 0;
+	bDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	subData.pSysMem = moonMesh.verticesList.data();
+
+	hr = myDev->CreateBuffer(&bDesc, &subData, &moonvBuff);
+	bDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bDesc.ByteWidth = sizeof(int) * (moonMesh.indicesList.size());
+	subData.pSysMem = moonMesh.indicesList.data();
+	hr = myDev->CreateBuffer(&bDesc, &subData, &mooniBuff);
+
+	// load our new mesh shader
+	hr = myDev->CreateVertexShader(MyLoadVShader, sizeof(MyLoadVShader), nullptr, &moonvShader);
+	hr = myDev->CreatePixelShader(MyLoadPShader, sizeof(MyLoadPShader), nullptr, &moonpShader);
+
+	// make matching input layout for mesh vertex
+	D3D11_INPUT_ELEMENT_DESC MoonInputDesc[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	hr = myDev->CreateInputLayout(MoonInputDesc, 3, MyLoadVShader, sizeof(MyLoadVShader), &moonMeshLayout);
+
+	hr = CreateDDSTextureFromFile(myDev, L"Assets/MoonTexture.dds", (ID3D11Resource**)&moonTexture, &moontextureRV);
 #pragma endregion
 
 #pragma region DepthBuffer(ZBuffer)
