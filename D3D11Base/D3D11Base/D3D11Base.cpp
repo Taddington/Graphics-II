@@ -213,7 +213,7 @@ ConstantBuffer myCBuff;
 XMMATRIX view;
 bool toReduceRadius = false;
 float nearPlane = 0.1f;
-float farPlane = 200.0f;
+float farPlane = 300.0f;
 float FOV = 2.0f;
 
 bool toSwitchScenes = false;
@@ -286,6 +286,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 #pragma region ViewAndProjectionMatrices
 		//view
+		float translationValue = 0.0f;
+		if (!toSwitchScenes)
+			translationValue = 0.1f;
+		if (toSwitchScenes)
+			translationValue = 0.5f;
 		float localX = 0.0f;
 		float localZ = 0.0f;
 		float globalY = 0.0f;
@@ -300,17 +305,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		if (GetAsyncKeyState(VK_UP))
 			xRot -= 0.01f;
 		if (GetAsyncKeyState('W'))
-			localZ += 0.1f;
+			localZ += translationValue;
 		if (GetAsyncKeyState('S'))
-			localZ -= 0.1f;
+			localZ -= translationValue;
 		if (GetAsyncKeyState('A'))
-			localX -= 0.1f;
+			localX -= translationValue;
 		if (GetAsyncKeyState('D'))
-			localX += 0.1f;
+			localX += translationValue;
 		if (GetAsyncKeyState(VK_SPACE))
-			globalY += 0.1f;
+			globalY += translationValue;
 		if (GetAsyncKeyState(VK_SHIFT))
-			globalY -= 0.1f;
+			globalY -= translationValue;
 		if (GetAsyncKeyState('U') && nearPlane < 50.0f)
 			nearPlane += 0.1f;
 		if (GetAsyncKeyState('J') && nearPlane > 0.15f)
