@@ -1,4 +1,4 @@
-Camera Tranlations:
+Camera Translations:
 W        - Forward
 S        - Backward
 A        - Left
